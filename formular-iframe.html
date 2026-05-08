@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prisförfrågan</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --card: #f8fafc;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #cbd5e1;
+      --focus: #2563eb;
+      --error: #b91c1c;
+      --button: #0ea5e9;
+      --button-hover: #0284c7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .form-card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 1.3rem;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 1rem;
+      background: #fff;
+      color: var(--text);
+    }
+
+    input:focus,
+    select:focus {
+      outline: 2px solid transparent;
+      border-color: var(--focus);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: auto;
+      margin-top: 2px;
+    }
+
+    .checkbox-row label {
+      margin: 0;
+      font-weight: 500;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .error {
+      display: none;
+      margin-top: 6px;
+      color: var(--error);
+      font-size: 0.9rem;
+    }
+
+    .has-error .error {
+      display: block;
+    }
+
+    .has-error input,
+    .has-error select {
+      border-color: var(--error);
+    }
+
+    button {
+      display: inline-block;
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--button);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--button-hover);
+    }
+
+    .ok-message {
+      display: none;
+      margin-top: 14px;
+      color: #065f46;
+      font-weight: 600;
+    }
+
+    .ok-message.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <form id="priceForm" class="form-card" novalidate>
+    <h1>Få en prisuppskattning</h1>
+
+    <div class="field" id="serviceField">
+      <label for="serviceType">Typ av tjänst</label>
+      <select id="serviceType" name="serviceType" required>
+        <option value="">Välj tjänst</option>
+        <option value="Flyttstädning">Flyttstädning</option>
+        <option value="Visningsstädning">Visningsstädning</option>
+        <option value="Fönsterputs">Fönsterputs</option>
+        <option value="Hemstädning">Hemstädning</option>
+        <option value="Storstädning">Storstädning</option>
+        <option value="Trappstädning BRFer">Trappstädning BRFer</option>
+        <option value="Byggstädning">Byggstädning</option>
+        <option value="Företagsstädning">Företagsstädning</option>
+      </select>
+      <div class="error">Välj en tjänst.</div>
+    </div>
+
+    <div class="field" id="propertyTypeField">
+      <label for="propertyType">Boendetyp</label>
+      <select id="propertyType" name="propertyType">
+        <option value="">Välj boendetyp</option>
+        <option value="lagenhet">Lägenhet</option>
+        <option value="radhus">Radhus</option>
+        <option value="villa">Villa</option>
+      </select>
+      <div class="error">Välj boendetyp.</div>
+    </div>
+
+    <div class="field" id="numRoomsField">
+      <label for="numRooms">Antal rum</label>
+      <input
+        id="numRooms"
+        name="numRooms"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        maxlength="2"
+        pattern="[0-9]+"
+      />
+      <div class="error">Ange endast siffror.</div>
+    </div>
+
+    <div class="field" id="sqmField">
+      <label for="squareMeters">Antal kvadratmeter</label>
+      <input
+        id="squareMeters"
+        name="squareMeters"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        maxlength="5"
+        pattern="[0-9]+"
+        required
+      />
+      <div class="error">Ange endast siffror.</div>
+    </div>
+
+    <div class="field" id="cityField">
+      <label for="city">Stad</label>
+      <input
+        id="city"
+        name="city"
+        type="text"
+        autocomplete="address-level2"
+        maxlength="50"
+        pattern="[A-Za-zÅÄÖåäö ]+"
+        required
+      />
+      <div class="error">Ange endast bokstäver.</div>
+    </div>
+
+    <div class="field" id="phoneField">
+      <label for="phone">Telefonnummer</label>
+      <input
+        id="phone"
+        name="phone"
+        type="text"
+        inputmode="numeric"
+        autocomplete="tel"
+        maxlength="15"
+        pattern="[0-9]+"
+        required
+      />
+      <div class="error">Ange endast siffror.</div>
+    </div>
+
+    <div class="field" id="emailField">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" required />
+      <div class="error">Ange en giltig e-postadress.</div>
+    </div>
+
+    <div class="field checkbox-row has-error" id="consentField">
+      <input id="consent" name="consent" type="checkbox" required />
+      <label for="consent">
+        Jag samtycker till att motta kommunikation i enlighet med integrationspolicy
+      </label>
+    </div>
+    <div class="error" id="consentError" style="margin-top: -10px; margin-bottom: 10px;">
+      Du behöver lämna samtycke för att gå vidare.
+    </div>
+
+    <button type="submit">Beräkna mitt pris</button>
+    <div id="okMessage" class="ok-message">Tack! Din förfrågan har skickats.</div>
+  </form>
+
+  <script>
+    (function () {
+      var form = document.getElementById("priceForm");
+      var okMessage = document.getElementById("okMessage");
+
+      var fields = {
+        service: {
+          input: document.getElementById("serviceType"),
+          wrapper: document.getElementById("serviceField"),
+          validate: function (value) {
+            return value.trim().length > 0;
+          }
+        },
+        propertyType: {
+          input: document.getElementById("propertyType"),
+          wrapper: document.getElementById("propertyTypeField"),
+          validate: function (value) {
+            // Valideras bara när fältet är synligt
+            if (propertyFieldsVisible()) {
+              return propertyTypeOptions.indexOf(value.trim()) !== -1;
+            }
+            return true;
+          }
+        },
+        numRooms: {
+          input: document.getElementById("numRooms"),
+          wrapper: document.getElementById("numRoomsField"),
+          validate: function (value) {
+            // Valideras bara när fältet är synligt
+            if (propertyFieldsVisible()) {
+              return /^[0-9]+$/.test(value.trim());
+            }
+            return true;
+          }
+        },
+        sqm: {
+          input: document.getElementById("squareMeters"),
+          wrapper: document.getElementById("sqmField"),
+          validate: function (value) {
+            return /^[0-9]+$/.test(value.trim());
+          }
+        },
+        city: {
+          input: document.getElementById("city"),
+          wrapper: document.getElementById("cityField"),
+          validate: function (value) {
+            return /^[A-Za-z\u00c5\u00c4\u00d6\u00e5\u00e4\u00f6 ]+$/.test(value.trim());
+          }
+        },
+        phone: {
+          input: document.getElementById("phone"),
+          wrapper: document.getElementById("phoneField"),
+          validate: function (value) {
+            return /^[0-9]+$/.test(value.trim());
+          }
+        },
+        email: {
+          input: document.getElementById("email"),
+          wrapper: document.getElementById("emailField"),
+          validate: function (value) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+          }
+        }
+      };
+
+      var consent = document.getElementById("consent");
+      var consentError = document.getElementById("consentError");
+
+      var propertyTypeField = document.getElementById("propertyTypeField");
+      var numRoomsField = document.getElementById("numRoomsField");
+      var serviceTypeSelect = document.getElementById("serviceType");
+
+      var servicesRequiringPropertyFields = [
+        "Flyttstädning",
+        "Hemstädning",
+        "Storstädning",
+        "Byggstädning",
+        "Visningsstädning"
+      ];
+      var propertyTypeOptions = ["lagenhet", "radhus", "villa"];
+
+      function propertyFieldsVisible() {
+        var value = serviceTypeSelect.value;
+        return servicesRequiringPropertyFields.indexOf(value) !== -1;
+      }
+
+      function updatePropertyFieldsVisibility() {
+        var shouldShow = propertyFieldsVisible();
+
+        if (shouldShow) {
+          propertyTypeField.style.display = "block";
+          numRoomsField.style.display = "block";
+        } else {
+          propertyTypeField.style.display = "none";
+          numRoomsField.style.display = "none";
+          // Rensa ev. tidigare felmarkeringar när vi döljer fälten
+          propertyTypeField.classList.remove("has-error");
+          numRoomsField.classList.remove("has-error");
+          fields.propertyType.input.value = "";
+          fields.numRooms.input.value = "";
+        }
+      }
+
+      function setFieldError(wrapper, hasError) {
+        if (hasError) {
+          wrapper.classList.add("has-error");
+        } else {
+          wrapper.classList.remove("has-error");
+        }
+      }
+
+      function enforcePattern(input, regex) {
+        input.addEventListener("input", function () {
+          var cleaned = "";
+          for (var i = 0; i < input.value.length; i++) {
+            var char = input.value.charAt(i);
+            if (regex.test(char)) {
+              cleaned += char;
+            }
+          }
+          input.value = cleaned;
+        });
+      }
+
+      enforcePattern(fields.sqm.input, /[0-9]/);
+      enforcePattern(fields.phone.input, /[0-9]/);
+      enforcePattern(fields.city.input, /[A-Za-z\u00c5\u00c4\u00d6\u00e5\u00e4\u00f6 ]/);
+      enforcePattern(fields.numRooms.input, /[0-9]/);
+
+      // Uppdatera fälten direkt vid sidladdning + när tjänst ändras
+      updatePropertyFieldsVisibility();
+      serviceTypeSelect.addEventListener("change", updatePropertyFieldsVisibility);
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        okMessage.classList.remove("show");
+
+        var hasAnyError = false;
+
+        Object.keys(fields).forEach(function (key) {
+          var field = fields[key];
+          var isValid = field.validate(field.input.value);
+          setFieldError(field.wrapper, !isValid);
+          if (!isValid) {
+            hasAnyError = true;
+          }
+        });
+
+        if (!consent.checked) {
+          consentError.style.display = "block";
+          hasAnyError = true;
+        } else {
+          consentError.style.display = "none";
+        }
+
+        if (!hasAnyError) {
+          okMessage.classList.add("show");
+          form.reset();
+          consentError.style.display = "none";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
