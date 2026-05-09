@@ -1,10 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
+const baseCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
+
+function getCorsHeaders(req?: Request) {
+  const requestedHeaders = req?.headers.get("Access-Control-Request-Headers")?.trim();
+  return {
+    ...baseCorsHeaders,
+    "Access-Control-Allow-Headers":
+      requestedHeaders || baseCorsHeaders["Access-Control-Allow-Headers"]
+  };
+}
 
 type BookingPayload = {
   action: "get" | "book";
@@ -18,7 +27,7 @@ const BOOKING_SITE_URL = "https://www.valstadat.com";
 
 function badRequest(message: string) {
   return new Response(JSON.stringify({ error: message }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
     status: 400
   });
 }
@@ -68,11 +77,11 @@ function normalizeSwedishPhoneNumber(phone: string): string | null {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req) });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 405
     });
   }
@@ -97,7 +106,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: "Missing Supabase env vars." }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
@@ -111,7 +120,7 @@ Deno.serve(async (req) => {
 
   if (offerError || !offerRow) {
     return new Response(JSON.stringify({ error: "Booking link is invalid or expired." }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 404
     });
   }
@@ -129,7 +138,7 @@ Deno.serve(async (req) => {
         booking: bookingRow ?? null
       }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         status: 200
       }
     );
@@ -160,7 +169,7 @@ Deno.serve(async (req) => {
 
   if (bookingError) {
     return new Response(JSON.stringify({ error: bookingError.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
@@ -272,7 +281,7 @@ Deno.serve(async (req) => {
       booking: bookingResult
     }),
     {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 200
     }
   );

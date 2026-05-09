@@ -134,3 +134,110 @@ button:disabled {
   color: #065f46;
   font-weight: 600;
 }
+
+.booking-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+
+.booking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.booking-title {
+  font-size: 2.35rem;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+.booking-date {
+  font-size: 0.9rem;
+  color: #8a8a8a;
+  font-weight: 600;
+}
+
+.booking-brand {
+  margin-top: 12px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d2d2d;
+}
+
+.booking-summary {
+  margin-top: 20px;
+}
+
+.booking-kicker {
+  font-size: 3rem;
+  color: #b35a5a;
+  margin: 0;
+  line-height: 1.05;
+}
+
+.booking-thanks {
+  margin: 4px 0 16px;
+  font-size: 2.15rem;
+  font-weight: 700;
+  color: #b35a5a;
+}
+
+.booking-section-title {
+  margin: 0 0 14px;
+  font-size: 2.05rem;
+  color: #b35a5a;
+}
+
+.booking-line-item {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 0;
+}
+
+.booking-line-label {
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.booking-line-value {
+  font-size: 2rem;
+  color: #2d2d2d;
+  line-height: 1.2;
+}
+
+.booking-price-wrap {
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  padding: 22px 0 10px;
+}
+
+.booking-price-label {
+  font-size: 1.8rem;
+  color: #b35a5a;
+}
+
+.booking-price-value {
+  font-size: 3.9rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #b35a5a;
+}
+
+.booking-price-sub {
+  margin-top: 6px;
+  font-size: 1.1rem;
+  color: #b35a5a;
+  font-style: italic;
+}
+
+.booking-form {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+  margin-top: 8px;
+}

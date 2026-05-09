@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseAnonKey, supabaseUrl } from "./lib/supabase";
 
 const serviceOptions = [
   "Flyttstadning",
@@ -75,6 +75,55 @@ const initialForm = {
   consent: false
 };
 
+async function invokeEdgeFunction(functionName, body) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { data: null, error: new Error("Supabase ar inte konfigurerat.") };
+  }
+
+  async function directFetchFallback(originalError) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { data: null, error: new Error("Supabase URL/API-nyckel saknas i frontend-miljon.") };
+    }
+    try {
+      const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`
+        },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message =
+          (payload && typeof payload === "object" && payload.error && String(payload.error)) ||
+          `Edge function returned status ${response.status}.`;
+        return { data: payload, error: new Error(message) };
+      }
+      return { data: payload, error: null };
+    } catch (fallbackError) {
+      if (fallbackError instanceof Error) {
+        return { data: null, error: fallbackError };
+      }
+      return {
+        data: null,
+        error: originalError instanceof Error ? originalError : new Error("Kunde inte na Edge Function.")
+      };
+    }
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke(functionName, { body });
+    if (!error) {
+      return { data, error: null };
+    }
+    return await directFetchFallback(error);
+  } catch (invokeThrowError) {
+    return await directFetchFallback(invokeThrowError);
+  }
+}
+
 function BookingPage({ bookingToken }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -84,6 +133,14 @@ function BookingPage({ bookingToken }) {
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const bookingDateLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString("sv-SE", {
+        day: "2-digit",
+        month: "short"
+      }).toUpperCase(),
+    []
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -97,8 +154,9 @@ function BookingPage({ bookingToken }) {
         return;
       }
 
-      const { data, error: invokeError } = await supabase.functions.invoke("booking-offer", {
-        body: { action: "get", token: bookingToken }
+      const { data, error: invokeError } = await invokeEdgeFunction("booking-offer", {
+        action: "get",
+        token: bookingToken
       });
 
       if (!mounted) return;
@@ -140,13 +198,11 @@ function BookingPage({ bookingToken }) {
     }
 
     setSubmitting(true);
-    const { data, error: invokeError } = await supabase.functions.invoke("booking-offer", {
-      body: {
-        action: "book",
-        token: bookingToken,
-        requestedDate,
-        acceptedOffer: true
-      }
+    const { data, error: invokeError } = await invokeEdgeFunction("booking-offer", {
+      action: "book",
+      token: bookingToken,
+      requestedDate,
+      acceptedOffer: true
     });
     setSubmitting(false);
 
@@ -182,17 +238,37 @@ function BookingPage({ bookingToken }) {
 
   return (
     <main className="page">
-      <section className="form-card">
-        <h1>Boka din tid</h1>
+      <section className="booking-card">
+        <div className="booking-header">
+          <h1 className="booking-title">
+            Offert {offer ? String(offer.service_type).toLowerCase() : ""}
+          </h1>
+          <span className="booking-date">{bookingDateLabel}</span>
+        </div>
+        <div className="booking-brand">Välstädat</div>
         {offer && (
-          <div style={{ marginBottom: "1rem" }}>
-            <p><strong>Tjanst:</strong> {offer.service_type}</p>
-            <p><strong>Stad:</strong> {offer.city}</p>
-            <p><strong>Offert:</strong> {Number(offer.offert).toFixed(2)} kr</p>
+          <div className="booking-summary">
+            <h2 className="booking-kicker">Hej,</h2>
+            <p className="booking-thanks">Tack för din bokningsbekräftelse!</p>
+            <h3 className="booking-section-title">Din förfrågan</h3>
+            <div className="booking-line-item">
+              <div className="booking-line-label">Typ av tjänst:</div>
+              <div className="booking-line-value">{offer.service_type}</div>
+            </div>
+            <div className="booking-line-item">
+              <div className="booking-line-label">Stad:</div>
+              <div className="booking-line-value">{offer.city}</div>
+            </div>
+            <div className="booking-price-wrap">
+              <div className="booking-price-label">Ditt pris:</div>
+              <div className="booking-price-value">{Math.round(Number(offer.offert))} kr</div>
+              <div className="booking-price-sub">Priset är inkl. moms och efter RUT-avdraget</div>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleBookingSubmit} noValidate>
+        <form onSubmit={handleBookingSubmit} noValidate className="booking-form">
+          <h3 className="booking-section-title">Boka din tid nu</h3>
           <div className="field">
             <label htmlFor="requestedDate">Valj datum for tjansten</label>
             <input
@@ -212,7 +288,7 @@ function BookingPage({ bookingToken }) {
               onChange={(e) => setAcceptedOffer(e.target.checked)}
               required
             />
-            <label htmlFor="acceptedOffer">Jag accepterar offerten</label>
+            <label htmlFor="acceptedOffer">Jag accepterar offerten och vill boka tjänsten.</label>
           </div>
 
           {error && <div className="error submit-error">{error}</div>}
@@ -403,26 +479,24 @@ function App() {
 
     setSubmitState({ loading: true, error: "" });
 
-    const { data, error } = await supabase.functions.invoke("calculate-offer", {
-      body: {
-        serviceType: form.serviceType,
-        propertyType: form.propertyType,
-        numRooms: Number(form.numRooms),
-        squareMeters: Number(form.squareMeters),
-        frequency: form.frequency,
-        businessLocalType: form.businessLocalType,
-        workstations: Number(form.workstations),
-        windowCount: Number(form.windowCount),
-        windowType: form.windowType,
-        glazedBalcony: form.glazedBalcony,
-        balconyWindowCount: Number(form.balconyWindowCount),
-        city: form.city.trim(),
-        phone: form.phone,
-        email: form.email.trim(),
-        bookingPageUrl:
-          typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "",
-        consent: form.consent
-      }
+    const { data, error } = await invokeEdgeFunction("calculate-offer", {
+      serviceType: form.serviceType,
+      propertyType: form.propertyType,
+      numRooms: Number(form.numRooms),
+      squareMeters: Number(form.squareMeters),
+      frequency: form.frequency,
+      businessLocalType: form.businessLocalType,
+      workstations: Number(form.workstations),
+      windowCount: Number(form.windowCount),
+      windowType: form.windowType,
+      glazedBalcony: form.glazedBalcony,
+      balconyWindowCount: Number(form.balconyWindowCount),
+      city: form.city.trim(),
+      phone: form.phone,
+      email: form.email.trim(),
+      bookingPageUrl:
+        typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "",
+      consent: form.consent
     });
 
     if (error) {

@@ -19,11 +19,20 @@ type QuoteRequest = {
   consent: boolean;
 };
 
-const corsHeaders = {
+const baseCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
+
+function getCorsHeaders(req?: Request) {
+  const requestedHeaders = req?.headers.get("Access-Control-Request-Headers")?.trim();
+  return {
+    ...baseCorsHeaders,
+    "Access-Control-Allow-Headers":
+      requestedHeaders || baseCorsHeaders["Access-Control-Allow-Headers"]
+  };
+}
 
 const supportedServices = new Set([
   "Flyttstadning",
@@ -66,7 +75,7 @@ function normalizeText(value: string): string {
 
 function badRequest(message: string) {
   return new Response(JSON.stringify({ error: message }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
     status: 400
   });
 }
@@ -275,12 +284,12 @@ function buildOfferEmailHtml(params: {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 405
     });
   }
@@ -380,7 +389,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) {
     return new Response(JSON.stringify({ error: "Missing Supabase env vars." }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
@@ -409,7 +418,7 @@ Deno.serve(async (req) => {
 
     if (businessPriceError) {
       return new Response(JSON.stringify({ error: businessPriceError.message }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         status: 500
       });
     }
@@ -434,7 +443,7 @@ Deno.serve(async (req) => {
 
       if (workstationPriceError) {
         return new Response(JSON.stringify({ error: workstationPriceError.message }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
           status: 500
         });
       }
@@ -463,7 +472,7 @@ Deno.serve(async (req) => {
 
     if (windowPriceError) {
       return new Response(JSON.stringify({ error: windowPriceError.message }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         status: 500
       });
     }
@@ -490,7 +499,7 @@ Deno.serve(async (req) => {
 
     if (priceError) {
       return new Response(JSON.stringify({ error: priceError.message }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         status: 500
       });
     }
@@ -558,7 +567,7 @@ Deno.serve(async (req) => {
 
   if (requestInsertError) {
     return new Response(JSON.stringify({ error: requestInsertError.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
@@ -578,7 +587,7 @@ Deno.serve(async (req) => {
 
   if (insertError) {
     return new Response(JSON.stringify({ error: insertError.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
@@ -662,7 +671,7 @@ Deno.serve(async (req) => {
       quote: insertedRow
     }),
     {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 200
     }
   );
