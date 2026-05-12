@@ -1,88 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase, supabaseAnonKey, supabaseUrl } from "./lib/supabase";
+import {
+  businessLocalTypeOptions,
+  frequencyOptions,
+  initialForm,
+  propertyTypeOptions,
+  serviceOptions,
+  servicesRequiringFrequency,
+  servicesRequiringPropertyFields,
+  stairFrequencyOptions,
+  windowTypeOptions,
+  yesNoOptions
+} from "./formConfig";
+import { getFormErrors } from "./formValidation";
 
-const serviceOptions = [
-  "Flyttstadning",
-  "Visningsstadning",
-  "Fonsterputs",
-  "Hemstadning",
-  "Storstadning",
-  "Trappstadning BRFer",
-  "Byggstadning",
-  "Foretagsstadning"
-];
-
-const servicesRequiringPropertyFields = [
-  "Flyttstadning",
-  "Hemstadning",
-  "Storstadning",
-  "Byggstadning",
-  "Visningsstadning"
-];
-
-const servicesRequiringFrequency = ["Foretagsstadning", "Hemstadning"];
-
-const propertyTypeOptions = [
-  { value: "lagenhet", label: "Lagenhet" },
-  { value: "radhus", label: "Radhus" },
-  { value: "villa", label: "Villa" }
-];
-
-const windowTypeOptions = [
-  "2-sidiga (In/utvandiga)",
-  "4-sidiga (In/utvandiga samt emellan)",
-  "Annan"
-];
-
-const yesNoOptions = ["Ja", "Nej"];
-
-const frequencyOptions = [
-  "Engångsstädning",
-  "1 gång/vecka",
-  "2 gånger/vecka",
-  "Varje dag",
-  "1 gång/månad",
-  "2 gånger/månad"
-];
-
-const businessLocalTypeOptions = ["Kontor", "Butik", "Industri"];
-
-const stairFrequencyOptions = [
-  "1 gång/vecka",
-  "Varannan vecka",
-  "1 gång/månad"
-];
-
-const initialForm = {
-  serviceType: "",
-  propertyType: "",
-  numRooms: "",
-  squareMeters: "",
-  frequency: "",
-  businessLocalType: "",
-  workstations: "",
-  stairFrequency: "",
-  windowCount: "",
-  windowType: "",
-  glazedBalcony: "",
-  balconyWindowCount: "",
-  stairwells: "",
-  floors: "",
-  elevators: "",
-  city: "",
-  phone: "",
-  email: "",
-  consent: false
-};
+function getOfferServiceTypeLabel(raw) {
+  const key = String(raw ?? "").trim();
+  if (!key) return "";
+  const match = serviceOptions.find((s) => s.value === key);
+  if (match) return match.label;
+  const businessLabels = {
+    kontorstädning: "Kontorsstädning",
+    butikstädning: "Butikstädning",
+    industristädning: "Industristädning"
+  };
+  return businessLabels[key] ?? key;
+}
 
 async function invokeEdgeFunction(functionName, body) {
   if (!isSupabaseConfigured || !supabase) {
-    return { data: null, error: new Error("Supabase ar inte konfigurerat.") };
+    return { data: null, error: new Error("Supabase är inte konfigurerat.") };
   }
 
   async function directFetchFallback(originalError) {
     if (!supabaseUrl || !supabaseAnonKey) {
-      return { data: null, error: new Error("Supabase URL/API-nyckel saknas i frontend-miljon.") };
+      return { data: null, error: new Error("Supabase-URL/API-nyckel saknas i frontend-miljön.") };
     }
     try {
       const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
@@ -108,7 +60,7 @@ async function invokeEdgeFunction(functionName, body) {
       }
       return {
         data: null,
-        error: originalError instanceof Error ? originalError : new Error("Kunde inte na Edge Function.")
+        error: originalError instanceof Error ? originalError : new Error("Kunde inte nå Edge-funktionen.")
       };
     }
   }
@@ -148,7 +100,7 @@ function BookingPage({ bookingToken }) {
     async function fetchBookingContext() {
       if (!isSupabaseConfigured || !supabase) {
         if (mounted) {
-          setError("Supabase ar inte konfigurerat.");
+          setError("Supabase är inte konfigurerat.");
           setLoading(false);
         }
         return;
@@ -161,15 +113,15 @@ function BookingPage({ bookingToken }) {
 
       if (!mounted) return;
       if (invokeError || data?.error) {
-        setError(data?.error || invokeError?.message || "Kunde inte hamta offert.");
+        setError(data?.error || invokeError?.message || "Kunde inte hämta offerten.");
         setLoading(false);
         return;
       }
 
       setOffer(data?.offer ?? null);
       setExistingBooking(data?.booking ?? null);
-      setRequestedDate(data?.booking?.requested_date ?? "");
-      setAcceptedOffer(Boolean(data?.booking?.accepted_offer));
+      setRequestedDate(data?.booking?.onskat_datum ?? "");
+      setAcceptedOffer(Boolean(data?.booking?.offert_accepterad));
       setLoading(false);
     }
 
@@ -185,15 +137,15 @@ function BookingPage({ bookingToken }) {
     setSuccessMessage("");
 
     if (!requestedDate) {
-      setError("Valj ett datum for bokning.");
+      setError("Välj ett datum för bokningen.");
       return;
     }
     if (!acceptedOffer) {
-      setError("Du maste acceptera offerten for att boka.");
+      setError("Du måste acceptera offerten för att boka.");
       return;
     }
     if (!isSupabaseConfigured || !supabase) {
-      setError("Supabase ar inte konfigurerat.");
+      setError("Supabase är inte konfigurerat.");
       return;
     }
 
@@ -212,14 +164,14 @@ function BookingPage({ bookingToken }) {
     }
 
     setExistingBooking(data?.booking ?? null);
-    setSuccessMessage("Tack! Din bokning ar registrerad.");
+    setSuccessMessage("Tack! Din bokning är registrerad.");
   }
 
   if (loading) {
     return (
       <main className="page">
         <section className="form-card">
-          <h1>Hamta bokningssida...</h1>
+          <h1>Hämtar bokningssida…</h1>
         </section>
       </main>
     );
@@ -241,7 +193,7 @@ function BookingPage({ bookingToken }) {
       <section className="booking-card">
         <div className="booking-header">
           <h1 className="booking-title">
-            Offert {offer ? String(offer.service_type).toLowerCase() : ""}
+            Offert {offer ? getOfferServiceTypeLabel(offer.tjanst_typ).toLowerCase() : ""}
           </h1>
           <span className="booking-date">{bookingDateLabel}</span>
         </div>
@@ -253,11 +205,11 @@ function BookingPage({ bookingToken }) {
             <h3 className="booking-section-title">Din förfrågan</h3>
             <div className="booking-line-item">
               <div className="booking-line-label">Typ av tjänst:</div>
-              <div className="booking-line-value">{offer.service_type}</div>
+              <div className="booking-line-value">{getOfferServiceTypeLabel(offer.tjanst_typ)}</div>
             </div>
             <div className="booking-line-item">
               <div className="booking-line-label">Stad:</div>
-              <div className="booking-line-value">{offer.city}</div>
+              <div className="booking-line-value">{offer.stad}</div>
             </div>
             <div className="booking-price-wrap">
               <div className="booking-price-label">Ditt pris:</div>
@@ -270,7 +222,7 @@ function BookingPage({ bookingToken }) {
         <form onSubmit={handleBookingSubmit} noValidate className="booking-form">
           <h3 className="booking-section-title">Boka din tid nu</h3>
           <div className="field">
-            <label htmlFor="requestedDate">Valj datum for tjansten</label>
+            <label htmlFor="requestedDate">Välj datum för tjänsten</label>
             <input
               id="requestedDate"
               type="date"
@@ -294,13 +246,13 @@ function BookingPage({ bookingToken }) {
           {error && <div className="error submit-error">{error}</div>}
           {existingBooking && (
             <div className="ok-message show">
-              Tidigare bokning: {existingBooking.requested_date}
+              Tidigare bokning: {existingBooking.onskat_datum}
             </div>
           )}
           {successMessage && <div className="ok-message show">{successMessage}</div>}
 
           <button type="submit" disabled={submitting}>
-            {submitting ? "Sparar..." : "Boka min tid"}
+            {submitting ? "Sparar…" : "Boka min tid"}
           </button>
         </form>
       </section>
@@ -326,108 +278,7 @@ function App() {
     error: ""
   });
 
-  const errors = useMemo(() => {
-    const propertyFieldsRequired = servicesRequiringPropertyFields.includes(form.serviceType);
-    const isStairService = form.serviceType === "Trappstadning BRFer";
-    const isWindowService = form.serviceType === "Fonsterputs";
-    const isBusinessService = form.serviceType === "Foretagsstadning";
-    const businessSqm = Number(form.squareMeters);
-
-    return {
-      serviceType: form.serviceType ? "" : "Valj en tjanst.",
-      propertyType: propertyFieldsRequired || isWindowService
-        ? propertyTypeOptions.some((option) => option.value === form.propertyType)
-          ? ""
-          : "Valj boendetyp."
-        : "",
-      numRooms: propertyFieldsRequired
-        ? /^[0-9]+$/.test(form.numRooms)
-          ? ""
-          : "Ange endast siffror."
-        : "",
-      squareMeters: isWindowService
-        ? ""
-        : isStairService
-        ? /^[0-9]+$/.test(form.squareMeters)
-          ? ""
-          : "Ange endast siffror."
-        : isBusinessService
-          ? /^[0-9]+$/.test(form.squareMeters) && Number.isFinite(businessSqm) && businessSqm >= 50
-            ? ""
-            : "Ange ett nummer som är 50 eller större."
-        : /^[0-9]+$/.test(form.squareMeters)
-          ? ""
-          : "Ange endast siffror.",
-      stairwells: isStairService
-        ? /^[0-9]+$/.test(form.stairwells)
-          ? ""
-          : "Ange endast siffror."
-        : "",
-      floors: isStairService
-        ? /^[0-9]+$/.test(form.floors)
-          ? ""
-          : "Ange endast siffror."
-        : "",
-      elevators: isStairService
-        ? /^[0-9]+$/.test(form.elevators)
-          ? ""
-          : "Ange endast siffror."
-        : "",
-      frequency:
-        servicesRequiringFrequency.includes(form.serviceType)
-          ? frequencyOptions.includes(form.frequency)
-            ? ""
-            : "Valj stadfrekvens."
-          : "",
-      businessLocalType:
-        form.serviceType === "Foretagsstadning"
-          ? businessLocalTypeOptions.includes(form.businessLocalType)
-            ? ""
-            : "Valj typ av lokal."
-          : "",
-      workstations:
-        form.serviceType === "Foretagsstadning" && form.businessLocalType === "Kontor"
-          ? /^[0-9]+$/.test(form.workstations)
-            ? ""
-            : "Ange endast siffror."
-          : "",
-      stairFrequency:
-        isStairService
-          ? stairFrequencyOptions.includes(form.stairFrequency)
-            ? ""
-            : "Valj stadfrekvens."
-          : "",
-      windowCount: isWindowService
-        ? /^[0-9]+$/.test(form.windowCount)
-          ? ""
-          : "Ange endast siffror."
-        : "",
-      windowType: isWindowService
-        ? windowTypeOptions.includes(form.windowType)
-          ? ""
-          : "Valj fonstertyp."
-        : "",
-      glazedBalcony: isWindowService
-        ? yesNoOptions.includes(form.glazedBalcony)
-          ? ""
-          : "Valj Ja eller Nej."
-        : "",
-      balconyWindowCount:
-        isWindowService && form.glazedBalcony === "Ja"
-          ? /^[0-9]+$/.test(form.balconyWindowCount)
-            ? ""
-            : "Ange endast siffror."
-          : "",
-      city: /^[A-Za-z ]+$/.test(form.city.trim()) ? "" : "Ange endast bokstaver.",
-      phone: /^[0-9]+$/.test(form.phone) ? "" : "Ange endast siffror.",
-      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
-        ? ""
-        : "Ange en giltig e-postadress.",
-      consent: form.consent
-        ? ""
-        : "Du behover lamna samtycke for att ga vidare."
-    };
-  }, [form]);
+  const errors = useMemo(() => getFormErrors(form), [form]);
 
   const hasErrors = Object.values(errors).some(Boolean);
 
@@ -472,7 +323,7 @@ function App() {
     if (!isSupabaseConfigured || !supabase) {
       setSubmitState({
         loading: false,
-        error: "Supabase ar inte konfigurerat. Kontrollera dina miljo-variabler."
+        error: "Supabase är inte konfigurerat. Kontrollera dina miljövariabler."
       });
       return;
     }
@@ -507,8 +358,8 @@ function App() {
       setSubmitState({
         loading: false,
         error: detail
-          ? "Kunde inte berakna offert: " + detail
-          : "Kunde inte berakna offert. Kontrollera edge function calculate-offer samt tabellerna kund_offert/offert_förfrågan."
+          ? "Kunde inte beräkna offert: " + detail
+          : "Kunde inte beräkna offert. Kontrollera edge function calculate-offer samt tabellerna kund_offert/offert_förfrågan."
       });
       return;
     }
@@ -524,10 +375,10 @@ function App() {
   return (
     <main className="page">
       <form className="form-card" onSubmit={handleSubmit} noValidate>
-        <h1>Fa en prisuppskattning</h1>
+        <h1>Få en prisuppskattning</h1>
 
         <div className={`field ${showError("serviceType") ? "has-error" : ""}`}>
-          <label htmlFor="serviceType">Typ av tjanst</label>
+          <label htmlFor="serviceType">Typ av tjänst</label>
           <select
             id="serviceType"
             value={form.serviceType}
@@ -618,10 +469,10 @@ function App() {
             onBlur={() => markTouched("serviceType")}
             required
           >
-            <option value="">Valj tjanst</option>
+            <option value="">Välj tjänst</option>
             {serviceOptions.map((service) => (
-              <option key={service} value={service}>
-                {service}
+              <option key={service.value} value={service.value}>
+                {service.label}
               </option>
             ))}
           </select>
@@ -645,7 +496,7 @@ function App() {
               onBlur={() => markTouched("businessLocalType")}
               required
             >
-              <option value="">Valj typ av lokal</option>
+              <option value="">Välj typ av lokal</option>
               {businessLocalTypeOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -668,7 +519,7 @@ function App() {
                 onBlur={() => markTouched("propertyType")}
                 required
               >
-                <option value="">Valj boendetyp</option>
+                <option value="">Välj boendetyp</option>
                 {propertyTypeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -768,7 +619,7 @@ function App() {
                 onBlur={() => markTouched("stairFrequency")}
                 required
               >
-                <option value="">Valj frekvens</option>
+                <option value="">Välj frekvens</option>
                 {stairFrequencyOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -804,10 +655,10 @@ function App() {
                 onBlur={() => markTouched("windowType")}
                 required
               >
-                <option value="">Valj fonstertyp</option>
+                <option value="">Välj fönstertyp</option>
                 {windowTypeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -830,7 +681,7 @@ function App() {
                 onBlur={() => markTouched("glazedBalcony")}
                 required
               >
-                <option value="">Valj Ja eller Nej</option>
+                <option value="">Välj Ja eller Nej</option>
                 {yesNoOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -904,7 +755,7 @@ function App() {
                     onBlur={() => markTouched("frequency")}
                     required
                   >
-                    <option value="">Valj frekvens</option>
+                    <option value="">Välj frekvens</option>
                     {frequencyOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
@@ -925,7 +776,7 @@ function App() {
             type="text"
             maxLength={50}
             value={form.city}
-            onChange={(e) => setField("city", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+            onChange={(e) => setField("city", e.target.value.replace(/[^\p{L} ]/gu, ""))}
             onBlur={() => markTouched("city")}
             required
           />
@@ -948,7 +799,7 @@ function App() {
         </div>
 
         <div className={`field ${showError("email") ? "has-error" : ""}`}>
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">E-postadress</label>
           <input
             id="email"
             type="email"
@@ -970,16 +821,16 @@ function App() {
             required
           />
           <label htmlFor="consent">
-            Jag samtycker till att motta kommunikation i enlighet med integrationspolicy
+            Jag samtycker till att ta emot kommunikation i enlighet med integritetspolicyn.
           </label>
         </div>
         {showError("consent") && <div className="error consent-error">{errors.consent}</div>}
 
         <button type="submit" disabled={submitState.loading}>
-          {submitState.loading ? "Skickar..." : "Berakna mitt pris"}
+          {submitState.loading ? "Skickar…" : "Beräkna mitt pris"}
         </button>
         {submitState.error && <div className="error submit-error">{submitState.error}</div>}
-        {submitted && <div className="ok-message show">Tack! Din forfragan har skickats.</div>}
+        {submitted && <div className="ok-message show">Tack! Din förfrågan har skickats.</div>}
       </form>
     </main>
   );

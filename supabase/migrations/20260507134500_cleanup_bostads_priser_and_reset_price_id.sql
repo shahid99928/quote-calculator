@@ -1,6 +1,33 @@
-delete from public.bostads_priser
-where service_type is null
-   or "städ_frekvens" is null;
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'bostads_priser'
+      and column_name = 'service_type'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'bostads_priser'
+      and column_name = 'städ_frekvens'
+  ) then
+    delete from public.bostads_priser
+    where service_type is null
+       or "städ_frekvens" is null;
+  elsif exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'bostads_priser'
+      and column_name = 'städ_frekvens'
+  ) then
+    delete from public.bostads_priser
+    where "städ_frekvens" is null;
+  end if;
+end
+$$;
 
 alter table public.bostads_priser
   alter column price_id drop identity if exists;

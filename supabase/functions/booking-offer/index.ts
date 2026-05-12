@@ -114,8 +114,8 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { data: offerRow, error: offerError } = await supabase
     .from("kund_offert")
-    .select("id, service_type, offert, city, phone, email, created_at")
-    .eq("booking_token", token)
+    .select("id, tjanst_typ, offert, stad, telefon, epost, skapad")
+    .eq("boknings_token", token)
     .single();
 
   if (offerError || !offerRow) {
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
   if (action === "get") {
     const { data: bookingRow } = await supabase
       .from("kund_bokningar")
-      .select("requested_date, accepted_offer, created_at, updated_at")
+      .select("onskat_datum, offert_accepterad, skapad, uppdaterad")
       .eq("kund_offert_id", offerRow.id)
       .maybeSingle();
 
@@ -158,13 +158,13 @@ Deno.serve(async (req) => {
     .upsert(
       {
         kund_offert_id: offerRow.id,
-        requested_date: requestedDate,
-        accepted_offer: true,
-        updated_at: new Date().toISOString()
+        onskat_datum: requestedDate,
+        offert_accepterad: true,
+        uppdaterad: new Date().toISOString()
       },
       { onConflict: "kund_offert_id" }
     )
-    .select("booking_id, kund_offert_id, requested_date, accepted_offer, created_at, updated_at")
+    .select("boknings_id, kund_offert_id, onskat_datum, offert_accepterad, skapad, uppdaterad")
     .single();
 
   if (bookingError) {
@@ -174,10 +174,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const serviceLabel = getServiceLabel(String(offerRow.service_type ?? ""));
+  const serviceLabel = getServiceLabel(String(offerRow.tjanst_typ ?? ""));
   const offertAmount = Number(offerRow.offert);
-  const bookingReference = `VS-${bookingResult.booking_id}`;
-  const confirmationText = `Din bokning är bekräftad hos Välstädat. Boknings-ID: ${bookingReference}. Tjänst: ${serviceLabel}. Datum: ${requestedDate}. Stad: ${offerRow.city}. Pris: ${Math.round(offertAmount)} kr.`;
+  const bookingReference = `VS-${bookingResult.boknings_id}`;
+  const confirmationText = `Din bokning är bekräftad hos Välstädat. Boknings-ID: ${bookingReference}. Tjänst: ${serviceLabel}. Datum: ${requestedDate}. Stad: ${offerRow.stad}. Pris: ${Math.round(offertAmount)} kr.`;
 
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
                 <strong>Boknings-ID:</strong> ${bookingReference}<br />
                 <strong>Tjänst:</strong> ${serviceLabel}<br />
                 <strong>Datum:</strong> ${requestedDate}<br />
-                <strong>Stad:</strong> ${offerRow.city}<br />
+                <strong>Stad:</strong> ${offerRow.stad}<br />
                 <strong>Offertpris:</strong> ${offertAmount.toFixed(2)} kr
               </td>
             </tr>
@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           from: `Välstädat <${resendFromEmail}>`,
-          to: [offerRow.email],
+          to: [offerRow.epost],
           subject: BOOKING_EMAIL_SUBJECT,
           html: confirmationHtml
         })
@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
   const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const twilioMessagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
-  const normalizedPhone = normalizeSwedishPhoneNumber(String(offerRow.phone ?? ""));
+  const normalizedPhone = normalizeSwedishPhoneNumber(String(offerRow.telefon ?? ""));
   if (twilioAccountSid && twilioAuthToken && twilioMessagingServiceSid && normalizedPhone) {
     try {
       const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;

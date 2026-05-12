@@ -210,11 +210,34 @@ function buildOfferEmailHtml(params: {
 
   return `<!doctype html>
 <html lang="sv">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .booking-btn:hover {
+        background: #9e4d4d !important;
+      }
+
+      @media only screen and (max-width: 640px) {
+        .email-shell {
+          width: 100% !important;
+          padding: 24px !important;
+        }
+        .booking-btn {
+          display: block !important;
+          width: 100% !important;
+          box-sizing: border-box !important;
+          text-align: center !important;
+          font-size: 24px !important;
+          padding: 10px 16px !important;
+        }
+      }
+    </style>
+  </head>
   <body style="margin:0;padding:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#2d2d2d;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
       <tr>
         <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="background:#ffffff;padding:32px 36px;">
+          <table role="presentation" class="email-shell" width="640" cellspacing="0" cellpadding="0" style="background:#ffffff;padding:32px 36px;">
             <tr>
               <td style="font-size:36px;font-weight:700;color:#2d2d2d;padding-bottom:20px;">Offert ${params.serviceLabel.toLowerCase()}</td>
               <td align="right" style="font-size:14px;color:#8a8a8a;padding-bottom:20px;">${dateLabel.toUpperCase()}</td>
@@ -257,9 +280,36 @@ function buildOfferEmailHtml(params: {
             </tr>
             <tr>
               <td colspan="2" align="center" style="padding:18px 0 26px;">
-                <a href="${params.bookingUrl}" style="font-size:40px;color:#7d7d7d;text-decoration:none;font-weight:700;">
-                  Boka din tid nu
-                </a>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                  <tr>
+                    <td align="center" bgcolor="#b35a5a" style="background-color:#b35a5a;border-radius:14px;">
+                      <a
+                        class="booking-btn"
+                        href="${params.bookingUrl}"
+                        target="_blank"
+                        style="
+                          display:block;
+                          width:100%;
+                          box-sizing:border-box;
+                          background-color:#b35a5a;
+                          border:1px solid #b35a5a;
+                          border-radius:14px;
+                          color:#ffffff !important;
+                          font-family:Arial,Helvetica,sans-serif;
+                          font-size:28px;
+                          font-weight:700;
+                          line-height:1.2;
+                          text-align:center;
+                          text-decoration:none;
+                          padding:10px 16px;
+                          -webkit-text-size-adjust:none;
+                        "
+                      >
+                        <span style="color:#ffffff !important;">Boka din tid här</span>
+                      </a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
@@ -408,12 +458,12 @@ Deno.serve(async (req) => {
   if (isBusinessService) {
     const { data: businessRows, error: businessPriceError } = await supabase
       .from("företags_priser")
-      .select("base_fee, price_per_sqm, sqm_from")
+      .select("grundavgift, pris_per_kvm, kvm_fran")
       .eq("typ_av_lokal", businessLocalType)
-      .eq("städ_frekvens", frequency)
-      .lte("sqm_from", squareMeters)
-      .gte("sqm_to", squareMeters)
-      .order("sqm_from", { ascending: false })
+      .eq("stadfrekvens", frequency)
+      .lte("kvm_fran", squareMeters)
+      .gte("kvm_till", squareMeters)
+      .order("kvm_fran", { ascending: false })
       .limit(1);
 
     if (businessPriceError) {
@@ -428,17 +478,17 @@ Deno.serve(async (req) => {
       return badRequest("No matching company price row found for selected sqm and frequency.");
     }
 
-    const baseFee = Number(businessRow.base_fee);
-    const pricePerSqm = Number(businessRow.price_per_sqm);
+    const baseFee = Number(businessRow.grundavgift);
+    const pricePerSqm = Number(businessRow.pris_per_kvm);
     let workstationsAddon = 0;
 
     if (businessLocalType === "Kontor") {
       const { data: workstationRows, error: workstationPriceError } = await supabase
         .from("kontors_arbetsplats_priser")
-        .select("monthly_addon_per_workstation, workstations_from")
-        .lte("workstations_from", workstations)
-        .gte("workstations_to", workstations)
-        .order("workstations_from", { ascending: false })
+        .select("manadstillagg_per_arbetsplats, arbetsplatser_fran")
+        .lte("arbetsplatser_fran", workstations)
+        .gte("arbetsplatser_till", workstations)
+        .order("arbetsplatser_fran", { ascending: false })
         .limit(1);
 
       if (workstationPriceError) {
@@ -453,7 +503,7 @@ Deno.serve(async (req) => {
         return badRequest("No matching workstation price row found for selected office size.");
       }
 
-      const addonPerWorkstation = Number(workstationRow.monthly_addon_per_workstation);
+      const addonPerWorkstation = Number(workstationRow.manadstillagg_per_arbetsplats);
       workstationsAddon = workstations * addonPerWorkstation;
     }
 
@@ -461,13 +511,13 @@ Deno.serve(async (req) => {
   } else if (isWindowService) {
     const { data: windowRows, error: windowPriceError } = await supabase
       .from("fönsterputs_priser")
-      .select("base_fee, price_per_window, balcony_window_price")
-      .eq("property_type", normalizedPropertyType)
-      .eq("window_type", windowType)
-      .eq("glazed_balcony", glazedBalcony)
-      .lte("window_count_from", windowCount)
-      .gte("window_count_to", windowCount)
-      .order("window_count_from", { ascending: false })
+      .select("grundavgift, pris_per_fonster, pris_balkongfonster")
+      .eq("boendetyp", normalizedPropertyType)
+      .eq("fonstertyp", windowType)
+      .eq("inglasad_balkong", glazedBalcony)
+      .lte("antal_fonster_fran", windowCount)
+      .gte("antal_fonster_till", windowCount)
+      .order("antal_fonster_fran", { ascending: false })
       .limit(1);
 
     if (windowPriceError) {
@@ -483,9 +533,9 @@ Deno.serve(async (req) => {
     }
 
     const effectiveBalconyWindowCount = glazedBalcony === "Ja" ? balconyWindowCount : 0;
-    const baseFee = Number(windowRow.base_fee);
-    const perWindowPrice = Number(windowRow.price_per_window);
-    const balconyPerWindowPrice = Number(windowRow.balcony_window_price);
+    const baseFee = Number(windowRow.grundavgift);
+    const perWindowPrice = Number(windowRow.pris_per_fonster);
+    const balconyPerWindowPrice = Number(windowRow.pris_balkongfonster);
     const laborCost =
       baseFee + windowCount * perWindowPrice + effectiveBalconyWindowCount * balconyPerWindowPrice;
     const totalWithVat = laborCost * (1 + VAT_RATE);
@@ -495,7 +545,7 @@ Deno.serve(async (req) => {
   } else {
     const { data: priceRows, error: priceError } = await supabase
       .from("bostads_priser")
-      .select("property_type, num_rooms, sqm_from, sqm_to, base_fee, price_per_sqm, städ_frekvens, service_type");
+      .select("boendetyp, antal_rum, kvm_fran, kvm_till, grundavgift, pris_per_kvm, stadfrekvens, tjanst_typ");
 
     if (priceError) {
       return new Response(JSON.stringify({ error: priceError.message }), {
@@ -508,28 +558,28 @@ Deno.serve(async (req) => {
     const targetHousingServiceType = isHomeService ? "Hemstadning" : serviceType;
     const targetFrequency = isHomeService ? frequency : "Engångsstädning";
     const propertyRows =
-      priceRows?.filter((row) => normalizeText(String(row.property_type)) === targetPropertyType) ?? [];
+      priceRows?.filter((row) => normalizeText(String(row.boendetyp)) === targetPropertyType) ?? [];
     const serviceScopedRows = propertyRows.filter(
-      (row) => String(row.service_type ?? "") === targetHousingServiceType
+      (row) => String(row.tjanst_typ ?? "") === targetHousingServiceType
     );
     const frequencyRows = serviceScopedRows.filter((row) => {
-      const rowFrequency = row["städ_frekvens"] ? String(row["städ_frekvens"]) : "";
+      const rowFrequency = row.stadfrekvens ? String(row.stadfrekvens) : "";
       return rowFrequency === targetFrequency;
     });
 
     const sqmMatchedRows = frequencyRows.filter((row) => {
-      const from = Number(row.sqm_from);
-      const to = Number(row.sqm_to);
+      const from = Number(row.kvm_fran);
+      const to = Number(row.kvm_till);
       return from <= squareMeters && squareMeters <= to;
     });
 
     const exactRoomMatch =
-      sqmMatchedRows.find((row) => Number(row.num_rooms) === numRooms) ?? null;
+      sqmMatchedRows.find((row) => Number(row.antal_rum) === numRooms) ?? null;
 
     const nearestRoomMatch =
       !exactRoomMatch && sqmMatchedRows.length > 0
         ? sqmMatchedRows.sort(
-            (a, b) => Math.abs(Number(a.num_rooms) - numRooms) - Math.abs(Number(b.num_rooms) - numRooms)
+            (a, b) => Math.abs(Number(a.antal_rum) - numRooms) - Math.abs(Number(b.antal_rum) - numRooms)
           )[0]
         : null;
 
@@ -539,8 +589,8 @@ Deno.serve(async (req) => {
       return badRequest("No matching price row found for selected property type and sqm.");
     }
 
-    const baseFee = Number(matchingRow.base_fee);
-    const pricePerSqm = Number(matchingRow.price_per_sqm);
+    const baseFee = Number(matchingRow.grundavgift);
+    const pricePerSqm = Number(matchingRow.pris_per_kvm);
     const laborCost = baseFee + squareMeters * pricePerSqm;
     const totalWithVat = laborCost * (1 + VAT_RATE);
     const rutDeduction = laborCost * RUT_DEDUCTION_RATE;
@@ -548,21 +598,21 @@ Deno.serve(async (req) => {
   }
 
   const { error: requestInsertError } = await supabase.from("offert_förfrågan").insert({
-    service_type: persistedServiceType,
+    tjanst_typ: persistedServiceType,
     typ_av_lokal: isBusinessService ? businessLocalType : null,
     antal_arbetsplatser: persistedServiceType === "kontorstädning" ? workstations : null,
-    property_type: isBusinessService ? null : normalizedPropertyType,
-    num_rooms: isBusinessService || isWindowService ? null : numRooms,
-    städ_frekvens: isBusinessService || isHomeService ? frequency : null,
-    square_meters: isWindowService ? null : Math.round(squareMeters),
-    window_count: isWindowService ? windowCount : null,
-    window_type: isWindowService ? windowType : null,
-    glazed_balcony: isWindowService ? glazedBalcony : null,
-    balcony_window_count: isWindowService && glazedBalcony === "Ja" ? balconyWindowCount : null,
-    city,
-    phone,
-    email,
-    consent
+    boendetyp: isBusinessService ? null : normalizedPropertyType,
+    antal_rum: isBusinessService || isWindowService ? null : numRooms,
+    stadfrekvens: isBusinessService || isHomeService ? frequency : null,
+    kvadratmeter: isWindowService ? null : Math.round(squareMeters),
+    antal_fonster: isWindowService ? windowCount : null,
+    fonstertyp: isWindowService ? windowType : null,
+    inglasad_balkong: isWindowService ? glazedBalcony : null,
+    antal_balkongfonster: isWindowService && glazedBalcony === "Ja" ? balconyWindowCount : null,
+    stad: city,
+    telefon: phone,
+    epost: email,
+    samtycke: consent
   });
 
   if (requestInsertError) {
@@ -575,14 +625,14 @@ Deno.serve(async (req) => {
   const { data: insertedRow, error: insertError } = await supabase
     .from("kund_offert")
     .insert({
-      service_type: persistedServiceType,
+      tjanst_typ: persistedServiceType,
       offert,
-      city,
-      phone,
-      email,
-      booking_token: createBookingToken()
+      stad: city,
+      telefon: phone,
+      epost: email,
+      boknings_token: createBookingToken()
     })
-    .select("id, offert, city, phone, email, created_at, booking_token")
+    .select("id, offert, stad, telefon, epost, skapad, boknings_token")
     .single();
 
   if (insertError) {
@@ -595,7 +645,7 @@ Deno.serve(async (req) => {
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
   const bookingBaseUrl = resolveBookingBaseUrl(req, bookingPageUrl);
-  const bookingUrl = buildBookingUrl(bookingBaseUrl, insertedRow.booking_token);
+  const bookingUrl = buildBookingUrl(bookingBaseUrl, insertedRow.boknings_token);
   if (resendApiKey && resendFromEmail) {
     try {
       const emailHtml = buildOfferEmailHtml({
@@ -635,6 +685,8 @@ Deno.serve(async (req) => {
   const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const twilioMessagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
   const normalizedPhone = normalizeSwedishPhoneNumber(phone);
+  let smsStatus: "sent" | "failed" | "skipped" = "skipped";
+  let smsError: string | null = null;
   if (twilioAccountSid && twilioAuthToken && twilioMessagingServiceSid && normalizedPhone) {
     try {
       const serviceLabel = getServiceLabel(persistedServiceType);
@@ -658,17 +710,27 @@ Deno.serve(async (req) => {
       if (!twilioResponse.ok) {
         const twilioErrorText = await twilioResponse.text();
         console.error("Twilio SMS failed:", twilioResponse.status, twilioErrorText);
+        smsStatus = "failed";
+        smsError = `Twilio ${twilioResponse.status}: ${twilioErrorText}`;
+      } else {
+        smsStatus = "sent";
       }
-    } catch (smsError) {
-      console.error("Unexpected Twilio SMS error:", smsError);
+    } catch (smsException) {
+      console.error("Unexpected Twilio SMS error:", smsException);
+      smsStatus = "failed";
+      smsError = smsException instanceof Error ? smsException.message : "Unexpected Twilio SMS error.";
     }
   } else {
     console.error("Twilio SMS skipped. Missing secrets or invalid phone format.");
+    smsStatus = "skipped";
+    smsError = "Twilio secrets missing or invalid phone format.";
   }
 
   return new Response(
     JSON.stringify({
-      quote: insertedRow
+      quote: insertedRow,
+      smsStatus,
+      smsError
     }),
     {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
