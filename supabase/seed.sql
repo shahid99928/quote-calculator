@@ -6,24 +6,6 @@ truncate table public."offert_förfrågan" restart identity cascade;
 truncate table public.kontors_arbetsplats_priser restart identity cascade;
 truncate table public."fönsterputs_priser" restart identity cascade;
 truncate table public."företags_priser" restart identity cascade;
-truncate table public.bostads_priser restart identity cascade;
-
-insert into public.bostads_priser (
-  boendetyp,
-  antal_rum,
-  kvm_fran,
-  kvm_till,
-  grundavgift,
-  pris_per_kvm,
-  stadfrekvens,
-  tjanst_typ
-)
-values
-  ('lägenhet', 2, 1, 120, 1000, 20, 'Engångsstädning', 'Flyttstadning'),
-  ('lägenhet', 2, 1, 120, 900, 18, 'Engångsstädning', 'Storstadning'),
-  ('lägenhet', 2, 1, 120, 950, 19, 'Engångsstädning', 'Byggstadning'),
-  ('lägenhet', 2, 1, 120, 850, 17, 'Engångsstädning', 'Visningsstadning'),
-  ('lägenhet', 2, 1, 120, 700, 14, '1 gång/månad', 'Hemstadning');
 
 insert into public."företags_priser" (
   typ_av_lokal,
