@@ -4,6 +4,7 @@ import {
   calculateHousingOfferBreakdown,
   type BostadsPrisRow
 } from "./housingLaborCost.ts";
+import type { TrappLaborBreakdown } from "./stairLaborCost.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -11,6 +12,10 @@ type QuoteRequest = {
   numRooms: number;
   squareMeters: number;
   frequency?: string;
+  stairwells?: number;
+  floors?: number;
+  elevators?: number;
+  stairFrequency?: string;
   businessLocalType?: string;
   workstations?: number;
   windowCount?: number;
@@ -46,8 +51,11 @@ const supportedServices = new Set([
   "Byggstadning",
   "Visningsstadning",
   "Fonsterputs",
-  "Foretagsstadning"
+  "Foretagsstadning",
+  "Trappstadning BRFer"
 ]);
+
+const allowedStairFrequencies = new Set(["1 gång/vecka", "Varannan vecka", "1 gång/månad"]);
 
 const allowedPropertyTypes = new Set(["lagenhet", "radhus", "villa"]);
 const allowedFrequencies = new Set([
@@ -110,6 +118,7 @@ function getServiceLabel(serviceType: string): string {
   if (normalized === "storstadning") return "Storstädning";
   if (normalized === "byggstadning") return "Byggstädning";
   if (normalized === "fonsterputs") return "Fönsterputs";
+  if (normalized === "trappstadning brfer") return "Trappstädning BRF:er";
   if (normalized === "kontorstadning") return "Kontorsstädning";
   if (normalized === "butikstadning") return "Butikstädning";
   if (normalized === "industristadning") return "Industristädning";
@@ -367,6 +376,11 @@ Deno.serve(async (req) => {
   const isHomeService = serviceType === "Hemstadning";
   const workstations = Number(payload.workstations);
   const isWindowService = serviceType === "Fonsterputs";
+  const isStairService = serviceType === "Trappstadning BRFer";
+  const stairwells = Number(payload.stairwells);
+  const floors = Number(payload.floors);
+  const elevators = Number(payload.elevators);
+  const stairFrequency = payload.stairFrequency?.trim() ?? "";
   const windowCount = Number(payload.windowCount);
   const balconyWindowCount = Number(payload.balconyWindowCount);
   const windowType = payload.windowType?.trim() ?? "";
@@ -400,6 +414,22 @@ Deno.serve(async (req) => {
       return badRequest(
         "frequency must be one of: Engångsstädning, 1 gång/vecka, 2 gånger/vecka, Varje dag, 1 gång/månad, 2 gånger/månad."
       );
+    }
+  } else if (isStairService) {
+    if (!Number.isInteger(stairwells) || stairwells < 1 || stairwells > 99) {
+      return badRequest("stairwells must be an integer between 1 and 99.");
+    }
+    if (!Number.isInteger(floors) || floors < 1 || floors > 99) {
+      return badRequest("floors must be an integer between 1 and 99.");
+    }
+    if (!Number.isInteger(elevators) || elevators < 0 || elevators > 99) {
+      return badRequest("elevators must be an integer between 0 and 99.");
+    }
+    if (!Number.isInteger(squareMeters) || squareMeters < 50 || squareMeters > 500) {
+      return badRequest("squareMeters must be between 50 and 500 for Trappstadning BRFer.");
+    }
+    if (!allowedStairFrequencies.has(stairFrequency)) {
+      return badRequest("stairFrequency must be one of: 1 gång/vecka, Varannan vecka, 1 gång/månad.");
     }
   } else if (isWindowService) {
     if (!allowedPropertyTypes.has(normalizedPropertyType)) {
@@ -461,6 +491,21 @@ Deno.serve(async (req) => {
 
   let offert: number;
   let housingPricing: ReturnType<typeof calculateHousingOfferBreakdown> | null = null;
+  let stairPricing: (TrappLaborBreakdown & { offert: number }) | null = null;
+
+  function mapTrappRpcError(message: string): string {
+    if (message.includes("KVM_OUT_OF_RANGE")) {
+      return "No kvm price tier found for selected square meters (50–500).";
+    }
+    if (message.includes("FREQUENCY_NOT_SUPPORTED")) {
+      return "stairFrequency must be one of: 1 gång/vecka, Varannan vecka, 1 gång/månad.";
+    }
+    if (message.includes("STYCKPRIS_MISSING")) {
+      return "Stair unit prices are not configured.";
+    }
+    return message;
+  }
+
   if (isBusinessService) {
     const { data: businessRows, error: businessPriceError } = await supabase
       .from("företags_priser")
@@ -514,6 +559,29 @@ Deno.serve(async (req) => {
     }
 
     offert = Number((baseFee + squareMeters * pricePerSqm + workstationsAddon).toFixed(2));
+  } else if (isStairService) {
+    const { data: trappBreakdown, error: trappPriceError } = await supabase.rpc("berakna_trapp_pris", {
+      p_kvm: Math.round(squareMeters),
+      p_antal_trapphus: stairwells,
+      p_antal_vaningar: floors,
+      p_antal_hissar: elevators,
+      p_stadfrekvens: stairFrequency
+    });
+
+    if (trappPriceError) {
+      return badRequest(mapTrappRpcError(trappPriceError.message));
+    }
+
+    const trappPris = Number((trappBreakdown as { arbetskostnad?: number })?.arbetskostnad);
+    if (!Number.isFinite(trappPris)) {
+      return badRequest("Could not calculate stair-cleaning price.");
+    }
+
+    offert = Number(trappPris.toFixed(2));
+    stairPricing = {
+      ...(trappBreakdown as TrappLaborBreakdown),
+      offert
+    };
   } else if (isWindowService) {
     const { data: windowRows, error: windowPriceError } = await supabase
       .from("fönsterputs_priser")
@@ -599,9 +667,12 @@ Deno.serve(async (req) => {
     tjanst_typ: persistedServiceType,
     typ_av_lokal: isBusinessService ? businessLocalType : null,
     antal_arbetsplatser: persistedServiceType === "kontorstädning" ? workstations : null,
-    boendetyp: isBusinessService ? null : normalizedPropertyType,
-    antal_rum: isBusinessService || isWindowService ? null : numRooms,
-    stadfrekvens: isBusinessService || isHomeService ? frequency : null,
+    boendetyp: isBusinessService || isStairService ? null : normalizedPropertyType,
+    antal_rum: isBusinessService || isWindowService || isStairService ? null : numRooms,
+    stadfrekvens: isBusinessService || isHomeService ? frequency : isStairService ? stairFrequency : null,
+    antal_trapphus: isStairService ? stairwells : null,
+    antal_vaningar: isStairService ? floors : null,
+    antal_hissar: isStairService ? elevators : null,
     kvadratmeter: isWindowService ? null : Math.round(squareMeters),
     antal_fonster: isWindowService ? windowCount : null,
     fonstertyp: isWindowService ? windowType : null,
@@ -728,6 +799,7 @@ Deno.serve(async (req) => {
     JSON.stringify({
       quote: insertedRow,
       ...(housingPricing ? { pricing: housingPricing } : {}),
+      ...(stairPricing ? { pricing: stairPricing } : {}),
       smsStatus,
       smsError
     }),

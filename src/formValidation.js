@@ -32,9 +32,12 @@ export function getFormErrors(form) {
     squareMeters: isWindowService
       ? ""
       : isStairService
-        ? /^[0-9]+$/.test(form.squareMeters)
-          ? ""
-          : "Ange endast siffror."
+        ? (() => {
+            if (!/^[0-9]+$/.test(form.squareMeters)) return "Ange endast siffror.";
+            const kvm = Number(form.squareMeters);
+            if (kvm < 50 || kvm > 500) return "Ange kvm mellan 50 och 500.";
+            return "";
+          })()
         : isBusinessService
           ? /^[0-9]+$/.test(form.squareMeters) && Number.isFinite(businessSqm) && businessSqm >= 50
             ? ""
