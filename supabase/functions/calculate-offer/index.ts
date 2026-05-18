@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  calculateHousingLaborCost,
+  calculateHousingOfferBreakdown,
+  type BostadsPrisRow
+} from "./housingLaborCost.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -455,6 +460,7 @@ Deno.serve(async (req) => {
       : serviceType;
 
   let offert: number;
+  let housingPricing: ReturnType<typeof calculateHousingOfferBreakdown> | null = null;
   if (isBusinessService) {
     const { data: businessRows, error: businessPriceError } = await supabase
       .from("företags_priser")
@@ -567,34 +573,26 @@ Deno.serve(async (req) => {
       return rowFrequency === targetFrequency;
     });
 
-    const sqmMatchedRows = frequencyRows.filter((row) => {
-      const from = Number(row.kvm_fran);
-      const to = Number(row.kvm_till);
-      return from <= squareMeters && squareMeters <= to;
-    });
-
-    const exactRoomMatch =
-      sqmMatchedRows.find((row) => Number(row.antal_rum) === numRooms) ?? null;
-
-    const nearestRoomMatch =
-      !exactRoomMatch && sqmMatchedRows.length > 0
-        ? sqmMatchedRows.sort(
-            (a, b) => Math.abs(Number(a.antal_rum) - numRooms) - Math.abs(Number(b.antal_rum) - numRooms)
-          )[0]
-        : null;
-
-    const matchingRow = exactRoomMatch ?? nearestRoomMatch;
-
-    if (!matchingRow) {
-      return badRequest("No matching price row found for selected property type and sqm.");
+    if (frequencyRows.length === 0) {
+      return badRequest("No matching price row found for selected property type and service.");
     }
 
-    const baseFee = Number(matchingRow.grundavgift);
-    const pricePerSqm = Number(matchingRow.pris_per_kvm);
-    const laborCost = baseFee + squareMeters * pricePerSqm;
-    const totalWithVat = laborCost * (1 + VAT_RATE);
-    const rutDeduction = laborCost * RUT_DEDUCTION_RATE;
-    offert = Number((totalWithVat - rutDeduction).toFixed(2));
+    const laborResult = calculateHousingLaborCost(
+      frequencyRows as BostadsPrisRow[],
+      numRooms,
+      squareMeters
+    );
+
+    if (!laborResult.ok) {
+      return badRequest(laborResult.error);
+    }
+
+    housingPricing = calculateHousingOfferBreakdown(
+      laborResult.laborCost,
+      VAT_RATE,
+      RUT_DEDUCTION_RATE
+    );
+    offert = housingPricing.offert;
   }
 
   const { error: requestInsertError } = await supabase.from("offert_förfrågan").insert({
@@ -729,6 +727,7 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       quote: insertedRow,
+      ...(housingPricing ? { pricing: housingPricing } : {}),
       smsStatus,
       smsError
     }),
