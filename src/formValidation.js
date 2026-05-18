@@ -8,6 +8,7 @@ import {
   windowTypeOptions,
   yesNoOptions
 } from "./formConfig";
+import { isValidEmail, isValidSwedishPhone, normalizePhoneDigits } from "./contactValidation";
 
 export function getFormErrors(form) {
   const propertyFieldsRequired = servicesRequiringPropertyFields.includes(form.serviceType);
@@ -104,8 +105,20 @@ export function getFormErrors(form) {
           : "Ange endast siffror."
         : "",
     city: /^[\p{L} ]+$/u.test(form.city.trim()) ? "" : "Ange endast bokstäver.",
-    phone: /^[0-9]+$/.test(form.phone) ? "" : "Ange endast siffror.",
-    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) ? "" : "Ange en giltig e-postadress.",
+    phone: (() => {
+      const digits = normalizePhoneDigits(form.phone);
+      if (!digits) return "Ange telefonnummer.";
+      if (!isValidSwedishPhone(digits)) {
+        return "Ange ett korrekt telefonnummer (t.ex. 0701234567).";
+      }
+      return "";
+    })(),
+    email: (() => {
+      const value = form.email.trim();
+      if (!value) return "Ange e-postadress.";
+      if (!isValidEmail(value)) return "Ange en korrekt e-postadress.";
+      return "";
+    })(),
     consent: form.consent ? "" : "Du behöver lämna samtycke för att gå vidare."
   };
 }

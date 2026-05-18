@@ -94,4 +94,20 @@ describe("getFormErrors", () => {
     const errors = getFormErrors(makeForm({ city: "Stockholm2" }));
     expect(errors.city).toBe("Ange endast bokstäver.");
   });
+
+  it("kräver korrekt svenskt telefonnummer", () => {
+    expect(getFormErrors(makeForm({ phone: "" })).phone).toBe("Ange telefonnummer.");
+    expect(getFormErrors(makeForm({ phone: "123" })).phone).toContain("korrekt telefonnummer");
+    expect(getFormErrors(makeForm({ phone: "0701234567" })).phone).toBe("");
+    expect(getFormErrors(makeForm({ phone: "46701234567" })).phone).toBe("");
+  });
+
+  it("kräver korrekt e-postadress", () => {
+    expect(getFormErrors(makeForm({ email: "" })).email).toBe("Ange e-postadress.");
+    expect(getFormErrors(makeForm({ email: "inte-en-e-post" })).email).toBe(
+      "Ange en korrekt e-postadress."
+    );
+    expect(getFormErrors(makeForm({ email: "a@b" })).email).toBe("Ange en korrekt e-postadress.");
+    expect(getFormErrors(makeForm({ email: "test@example.com" })).email).toBe("");
+  });
 });

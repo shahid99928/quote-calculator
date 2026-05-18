@@ -301,8 +301,6 @@ function App() {
 
   const errors = useMemo(() => getFormErrors(form), [form]);
 
-  const hasErrors = Object.values(errors).some(Boolean);
-
   function setField(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
@@ -337,7 +335,8 @@ function App() {
     setSubmitted(false);
     setSubmitState({ loading: false, error: "" });
 
-    if (hasErrors) {
+    const validationErrors = getFormErrors(form);
+    if (Object.values(validationErrors).some(Boolean)) {
       return;
     }
 
