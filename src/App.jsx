@@ -27,6 +27,13 @@ function getOfferServiceTypeLabel(raw) {
   return businessLabels[key] ?? key;
 }
 
+function getOfferPriceSubtext(serviceType) {
+  if (String(serviceType ?? "").trim() === "Trappstadning BRFer") {
+    return "Priset är exkl. moms och RUT-avdrag.";
+  }
+  return "Priset är inkl. moms och efter RUT-avdraget";
+}
+
 async function invokeEdgeFunction(functionName, body) {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: new Error("Supabase är inte konfigurerat.") };
@@ -214,7 +221,7 @@ function BookingPage({ bookingToken }) {
             <div className="booking-price-wrap">
               <div className="booking-price-label">Ditt pris:</div>
               <div className="booking-price-value">{Math.round(Number(offer.offert))} kr</div>
-              <div className="booking-price-sub">Priset är inkl. moms och efter RUT-avdraget</div>
+              <div className="booking-price-sub">{getOfferPriceSubtext(offer.tjanst_typ)}</div>
             </div>
           </div>
         )}

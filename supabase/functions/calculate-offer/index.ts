@@ -201,13 +201,22 @@ function buildBookingUrl(baseUrl: string, token: string): string {
   return parsed.toString();
 }
 
+function getOfferPriceSubtext(serviceType: string): string {
+  if (serviceType === "Trappstadning BRFer") {
+    return "Priset är exkl. moms och RUT-avdrag.";
+  }
+  return "Priset är inkl. moms och efter RUT-avdraget";
+}
+
 function buildOfferEmailHtml(params: {
   city: string;
   serviceLabel: string;
+  serviceType: string;
   squareMeters: number | null;
   offert: number;
   bookingUrl: string;
 }) {
+  const priceSubtext = getOfferPriceSubtext(params.serviceType);
   const today = new Date();
   const dateLabel = today.toLocaleDateString("sv-SE", {
     day: "2-digit",
@@ -288,7 +297,7 @@ function buildOfferEmailHtml(params: {
                 <div style="font-size:22px;color:#b35a5a;">Ditt pris:</div>
                 <div style="font-size:58px;font-weight:700;color:#b35a5a;line-height:1.1;">${Math.round(params.offert)} kr</div>
                 <div style="font-size:26px;font-style:italic;color:#b35a5a;padding-top:8px;">
-                  Priset är inkl. moms och efter RUT-avdraget
+                  ${priceSubtext}
                 </div>
               </td>
             </tr>
@@ -720,6 +729,7 @@ Deno.serve(async (req) => {
       const emailHtml = buildOfferEmailHtml({
         city,
         serviceLabel: getServiceLabel(persistedServiceType),
+        serviceType,
         squareMeters: isWindowService ? null : Math.round(squareMeters),
         offert,
         bookingUrl
