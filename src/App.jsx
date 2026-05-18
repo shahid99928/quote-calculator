@@ -27,8 +27,20 @@ function getOfferServiceTypeLabel(raw) {
   return businessLabels[key] ?? key;
 }
 
-function getOfferPriceSubtext(serviceType) {
-  if (String(serviceType ?? "").trim() === "Trappstadning BRFer") {
+function normalizeServiceKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function isTrappstadningService(...values) {
+  return values.some((value) => normalizeServiceKey(value) === "trappstadning brfer");
+}
+
+function getOfferPriceSubtext(...serviceValues) {
+  if (isTrappstadningService(...serviceValues)) {
     return "Priset är exkl. moms och RUT-avdrag.";
   }
   return "Priset är inkl. moms och efter RUT-avdraget";
@@ -221,7 +233,9 @@ function BookingPage({ bookingToken }) {
             <div className="booking-price-wrap">
               <div className="booking-price-label">Ditt pris:</div>
               <div className="booking-price-value">{Math.round(Number(offer.offert))} kr</div>
-              <div className="booking-price-sub">{getOfferPriceSubtext(offer.tjanst_typ)}</div>
+              <div className="booking-price-sub">
+                {getOfferPriceSubtext(offer.tjanst_typ, getOfferServiceTypeLabel(offer.tjanst_typ))}
+              </div>
             </div>
           </div>
         )}

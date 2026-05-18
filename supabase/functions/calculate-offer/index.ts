@@ -201,8 +201,12 @@ function buildBookingUrl(baseUrl: string, token: string): string {
   return parsed.toString();
 }
 
-function getOfferPriceSubtext(serviceType: string): string {
-  if (serviceType === "Trappstadning BRFer") {
+function isTrappstadningService(...values: (string | undefined)[]): boolean {
+  return values.some((value) => normalizeText(String(value ?? "")) === "trappstadning brfer");
+}
+
+function getOfferPriceSubtext(...serviceValues: (string | undefined)[]): string {
+  if (isTrappstadningService(...serviceValues)) {
     return "Priset är exkl. moms och RUT-avdrag.";
   }
   return "Priset är inkl. moms och efter RUT-avdraget";
@@ -216,7 +220,7 @@ function buildOfferEmailHtml(params: {
   offert: number;
   bookingUrl: string;
 }) {
-  const priceSubtext = getOfferPriceSubtext(params.serviceType);
+  const priceSubtext = getOfferPriceSubtext(params.serviceType, params.serviceLabel);
   const today = new Date();
   const dateLabel = today.toLocaleDateString("sv-SE", {
     day: "2-digit",
@@ -726,10 +730,11 @@ Deno.serve(async (req) => {
   const bookingUrl = buildBookingUrl(bookingBaseUrl, insertedRow.boknings_token);
   if (resendApiKey && resendFromEmail) {
     try {
+      const serviceLabel = getServiceLabel(persistedServiceType);
       const emailHtml = buildOfferEmailHtml({
         city,
-        serviceLabel: getServiceLabel(persistedServiceType),
-        serviceType,
+        serviceLabel,
+        serviceType: isStairService ? serviceType : persistedServiceType,
         squareMeters: isWindowService ? null : Math.round(squareMeters),
         offert,
         bookingUrl
