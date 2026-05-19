@@ -85,6 +85,42 @@ describe("getFormErrors", () => {
     expect(errors.workstations).toBe("Ange endast siffror.");
   });
 
+  it("validates Fonsterputs window count range", () => {
+    expect(
+      getFormErrors(
+        makeForm({
+          serviceType: "Fonsterputs",
+          propertyType: "villa",
+          windowCount: "0",
+          windowType: "2-sidiga (In/utvandiga)",
+          glazedBalcony: "Nej"
+        })
+      ).windowCount
+    ).toContain("mellan");
+    expect(
+      getFormErrors(
+        makeForm({
+          serviceType: "Fonsterputs",
+          propertyType: "villa",
+          windowCount: "101",
+          windowType: "2-sidiga (In/utvandiga)",
+          glazedBalcony: "Nej"
+        })
+      ).windowCount
+    ).toContain("mellan");
+    expect(
+      getFormErrors(
+        makeForm({
+          serviceType: "Fonsterputs",
+          propertyType: "villa",
+          windowCount: "75",
+          windowType: "2-sidiga (In/utvandiga)",
+          glazedBalcony: "Nej"
+        })
+      ).windowCount
+    ).toBe("");
+  });
+
   it("validates Fonsterputs balcony count rules", () => {
     const withBalcony = getFormErrors(
       makeForm({

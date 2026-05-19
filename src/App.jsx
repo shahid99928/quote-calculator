@@ -15,6 +15,7 @@ import {
 import { sanitizeMobilePhoneInput } from "./contactValidation";
 import { getFormErrors } from "./formValidation";
 import { sanitizeRoomCountInput } from "./roomCountValidation";
+import { sanitizeWindowCountInput } from "./windowCountValidation";
 import {
   getSquareMetersLimits,
   sanitizeSquareMetersInput
@@ -678,9 +679,9 @@ function App() {
                 id="windowCount"
                 type="text"
                 inputMode="numeric"
-                maxLength={4}
+                maxLength={3}
                 value={form.windowCount}
-                onChange={(e) => setField("windowCount", e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => setField("windowCount", sanitizeWindowCountInput(e.target.value))}
                 onBlur={() => markTouched("windowCount")}
                 required
               />

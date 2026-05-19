@@ -11,6 +11,7 @@ import {
 import { isValidEmail, isValidSwedishPhone, normalizePhoneDigits } from "./contactValidation";
 import { validateNumRooms } from "./roomCountValidation";
 import { validateSquareMeters } from "./squareMetersValidation";
+import { validateWindowCount } from "./windowCountValidation";
 
 export function getFormErrors(form) {
   const propertyFieldsRequired = servicesRequiringPropertyFields.includes(form.serviceType);
@@ -65,11 +66,7 @@ export function getFormErrors(form) {
         ? ""
         : "Välj städfrekvens."
       : "",
-    windowCount: isWindowService
-      ? /^[0-9]+$/.test(form.windowCount)
-        ? ""
-        : "Ange endast siffror."
-      : "",
+    windowCount: isWindowService ? validateWindowCount(form.windowCount) : "",
     windowType: isWindowService
       ? windowTypeOptions.some((option) => option.value === form.windowType)
         ? ""

@@ -14,6 +14,7 @@ import {
   getSquareMetersLimitsForService,
   validateSquareMetersForService
 } from "./squareMetersRules.ts";
+import { validateWindowCountForService } from "./windowCountRules.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -466,8 +467,9 @@ Deno.serve(async (req) => {
     if (!allowedPropertyTypes.has(normalizedPropertyType)) {
       return badRequest("Property type must be one of: lagenhet, radhus, villa.");
     }
-    if (!Number.isInteger(windowCount) || windowCount <= 0) {
-      return badRequest("windowCount must be a positive integer.");
+    const windowCountValidationError = validateWindowCountForService(windowCount);
+    if (windowCountValidationError) {
+      return badRequest(windowCountValidationError);
     }
     if (!allowedWindowTypes.has(windowType)) {
       return badRequest(
@@ -530,6 +532,7 @@ Deno.serve(async (req) => {
       normalizedPropertyType,
       numRooms,
       roundedSquareMeters,
+      windowCount,
       isHousingPropertyService
     )
   ) {
@@ -545,10 +548,11 @@ Deno.serve(async (req) => {
       antal_vaningar: isStairService ? floors : null,
       antal_hissar: isStairService ? elevators : null,
       kvadratmeter: isWindowService ? null : roundedSquareMeters,
-      antal_fonster: null,
-      fonstertyp: null,
-      inglasad_balkong: null,
-      antal_balkongfonster: null,
+      antal_fonster: isWindowService ? windowCount : null,
+      fonstertyp: isWindowService ? windowType : null,
+      inglasad_balkong: isWindowService ? glazedBalcony : null,
+      antal_balkongfonster:
+        isWindowService && glazedBalcony === "Ja" ? balconyWindowCount : null,
       stad: city,
       telefon: phone,
       epost: email,
