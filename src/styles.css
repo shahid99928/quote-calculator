@@ -245,13 +245,17 @@ button:disabled {
 .booking-date-picker {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .booking-date-picker-label {
   font-weight: 600;
   color: #374151;
+  text-align: center;
+  width: 100%;
 }
 
 .booking-date-picker-panel {
@@ -259,7 +263,9 @@ button:disabled {
   border-radius: 12px;
   padding: 12px;
   background: #fafafa;
+  width: 100%;
   max-width: 360px;
+  margin: 0 auto;
 }
 
 .booking-date-picker-nav {
@@ -349,4 +355,6 @@ button:disabled {
   margin: 0;
   font-size: 0.95rem;
   color: #4b5563;
+  text-align: center;
+  width: 100%;
 }
