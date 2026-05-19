@@ -20,6 +20,7 @@ import {
   getSquareMetersLimits,
   sanitizeSquareMetersInput
 } from "./squareMetersValidation";
+import { getOfferPriceSubtext } from "./offerPriceSubtext";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -32,25 +33,6 @@ function getOfferServiceTypeLabel(raw) {
     industristädning: "Industristädning"
   };
   return businessLabels[key] ?? key;
-}
-
-function normalizeServiceKey(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function isTrappstadningService(...values) {
-  return values.some((value) => normalizeServiceKey(value) === "trappstadning brfer");
-}
-
-function getOfferPriceSubtext(...serviceValues) {
-  if (isTrappstadningService(...serviceValues)) {
-    return "Priset är exkl. moms och RUT-avdrag.";
-  }
-  return "Priset är inkl. moms och efter RUT-avdraget";
 }
 
 function getBookingPageUrl() {

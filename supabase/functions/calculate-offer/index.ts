@@ -21,6 +21,7 @@ import {
   deleteOffertForfraganById,
   saveOffertForfragan
 } from "./offertForfraganInsert.ts";
+import { getOfferPriceSubtext } from "./offerPriceSubtext.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -142,17 +143,6 @@ function getServiceLabel(serviceType: string): string {
 
 function createBookingToken(): string {
   return crypto.randomUUID().replace(/-/g, "");
-}
-
-function isTrappstadningService(...values: (string | undefined)[]): boolean {
-  return values.some((value) => normalizeText(String(value ?? "")) === "trappstadning brfer");
-}
-
-function getOfferPriceSubtext(...serviceValues: (string | undefined)[]): string {
-  if (isTrappstadningService(...serviceValues)) {
-    return "Priset är exkl. moms och RUT-avdrag.";
-  }
-  return "Priset är inkl. moms och efter RUT-avdraget";
 }
 
 function buildOfferEmailHtml(params: {
@@ -591,6 +581,7 @@ Deno.serve(async (req) => {
       workstationsAddon = workstations * addonPerWorkstation;
     }
 
+    // Slutpris exkl. moms och RUT (samma modell som trappstädning).
     offert = Number((baseFee + squareMeters * pricePerSqm + workstationsAddon).toFixed(2));
   } else if (isStairService) {
     const { data: trappBreakdown, error: trappPriceError } = await supabase.rpc("berakna_trapp_pris", {
