@@ -21,7 +21,12 @@ import {
   sanitizeSquareMetersInput
 } from "./squareMetersValidation";
 import { getOfferPriceSubtext } from "./offerPriceSubtext";
-import { getMinBookingDateString, validateBookingDate } from "./bookingDate";
+import { BookingDatePicker } from "./BookingDatePicker";
+import {
+  getMinBookingDateString,
+  isBookingDateNotInPast,
+  validateBookingDate
+} from "./bookingDate";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -141,7 +146,10 @@ function BookingPage({ bookingToken }) {
 
       setOffer(data?.offer ?? null);
       setExistingBooking(data?.booking ?? null);
-      setRequestedDate(data?.booking?.onskat_datum ?? "");
+      const loadedDate = data?.booking?.onskat_datum ?? "";
+      setRequestedDate(
+        isBookingDateNotInPast(loadedDate, getMinBookingDateString()) ? loadedDate : ""
+      );
       setAcceptedOffer(Boolean(data?.booking?.offert_accepterad));
       setLoading(false);
     }
@@ -181,7 +189,11 @@ function BookingPage({ bookingToken }) {
     setSubmitting(false);
 
     if (invokeError || data?.error) {
-      setError(data?.error || invokeError?.message || "Kunde inte spara bokningen.");
+      const raw = data?.error || invokeError?.message || "";
+      const message = String(raw).includes("requestedDate")
+        ? "Datumet kan inte ligga i det förflutna."
+        : raw || "Kunde inte spara bokningen.";
+      setError(message);
       return;
     }
 
@@ -245,17 +257,13 @@ function BookingPage({ bookingToken }) {
 
         <form onSubmit={handleBookingSubmit} noValidate className="booking-form">
           <h3 className="booking-section-title">Boka din tid nu</h3>
-          <div className="field">
-            <label htmlFor="requestedDate">Välj datum för tjänsten</label>
-            <input
-              id="requestedDate"
-              type="date"
-              min={minBookingDate}
-              value={requestedDate}
-              onChange={(e) => setRequestedDate(e.target.value)}
-              required
-            />
-          </div>
+          <BookingDatePicker
+            id="requestedDate"
+            label="Välj datum för tjänsten"
+            value={requestedDate}
+            minDate={minBookingDate}
+            onChange={setRequestedDate}
+          />
 
           <div className="field checkbox-row">
             <input

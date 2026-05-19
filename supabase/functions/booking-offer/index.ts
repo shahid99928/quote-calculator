@@ -156,9 +156,7 @@ Deno.serve(async (req) => {
     return badRequest("Offer must be accepted before booking.");
   }
   if (!isValidDate(requestedDate)) {
-    return badRequest(
-      "requestedDate must be today or later, in YYYY-MM-DD format (Europe/Stockholm)."
-    );
+    return badRequest("Datumet kan inte ligga i det förflutna.");
   }
 
   const { data: bookingResult, error: bookingError } = await supabase
