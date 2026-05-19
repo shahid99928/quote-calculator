@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 /** Row shape for public.offert_förfrågan – used for both automatic and manual quote flows. */
 export type OffertForfraganInsert = {
   tjanst_typ: string;
@@ -81,7 +83,12 @@ export function buildOffertForfraganRow(params: BuildOffertForfraganParams): Off
     typ_av_lokal: isBusinessService ? businessLocalType : null,
     antal_arbetsplatser: persistedServiceType === "kontorstädning" ? workstations : null,
     boendetyp: isBusinessService || isStairService ? null : normalizedPropertyType,
-    antal_rum: isBusinessService || isWindowService || isStairService ? null : numRooms,
+    antal_rum:
+      isBusinessService || isWindowService || isStairService
+        ? null
+        : Number.isInteger(numRooms) && numRooms > 0
+          ? numRooms
+          : null,
     stadfrekvens:
       isBusinessService || isHomeService
         ? frequency
@@ -102,4 +109,28 @@ export function buildOffertForfraganRow(params: BuildOffertForfraganParams): Off
     epost: email,
     samtycke: consent
   };
+}
+
+export async function saveOffertForfragan(
+  supabase: SupabaseClient,
+  row: OffertForfraganInsert
+): Promise<{ id: number | null; error: string | null }> {
+  const { data, error } = await supabase.from("offert_förfrågan").insert(row).select("id").single();
+
+  if (error) {
+    console.error("offert_förfrågan insert failed:", error.message, row);
+    return { id: null, error: error.message };
+  }
+
+  return { id: data?.id ?? null, error: null };
+}
+
+export async function deleteOffertForfraganById(
+  supabase: SupabaseClient,
+  id: number
+): Promise<void> {
+  const { error } = await supabase.from("offert_förfrågan").delete().eq("id", id);
+  if (error) {
+    console.error("offert_förfrågan rollback delete failed:", error.message, id);
+  }
 }

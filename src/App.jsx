@@ -53,6 +53,17 @@ function getOfferPriceSubtext(...serviceValues) {
   return "Priset är inkl. moms och efter RUT-avdraget";
 }
 
+function getBookingPageUrl() {
+  if (typeof window === "undefined") return "";
+  const configured = String(import.meta.env.VITE_BOOKING_PAGE_URL ?? "").trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+  const { origin, pathname } = window.location;
+  const path = pathname && pathname !== "/" ? pathname.replace(/\/$/, "") : "";
+  return `${origin}${path}`;
+}
+
 async function invokeEdgeFunction(functionName, body) {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: new Error("Supabase är inte konfigurerat.") };
@@ -378,8 +389,7 @@ function App() {
       city: form.city.trim(),
       phone: form.phone,
       email: form.email.trim(),
-      bookingPageUrl:
-        typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "",
+      bookingPageUrl: getBookingPageUrl(),
       consent: form.consent
     });
 
@@ -398,10 +408,15 @@ function App() {
     }
 
     setSubmitState({ loading: false, error: "" });
-    setSuccessMessage(
+    const savedRequestId = data?.offertForfraganId;
+    const baseMessage =
       data?.manualReview && data?.message
         ? String(data.message)
-        : "Tack! Din förfrågan har skickats."
+        : "Tack! Din förfrågan har skickats.";
+    setSuccessMessage(
+      savedRequestId
+        ? `${baseMessage} Din förfrågan är sparad (referens ${savedRequestId}).`
+        : baseMessage
     );
     setSubmitted(true);
     setForm(initialForm);

@@ -15,7 +15,12 @@ import {
   validateSquareMetersForService
 } from "./squareMetersRules.ts";
 import { validateWindowCountForService } from "./windowCountRules.ts";
-import { buildOffertForfraganRow } from "./offertForfraganInsert.ts";
+import { buildBookingUrl, resolveBookingBaseUrl } from "./bookingUrl.ts";
+import {
+  buildOffertForfraganRow,
+  deleteOffertForfraganById,
+  saveOffertForfragan
+} from "./offertForfraganInsert.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -87,7 +92,6 @@ const allowedGlazedBalconyOptions = new Set(["Ja", "Nej"]);
 const VAT_RATE = 0.25;
 const RUT_DEDUCTION_RATE = 0.5;
 const OFFER_EMAIL_SUBJECT = "Din offert - Välstädat";
-const OFFER_SMS_BOOKING_URL = "https://www.valstadat.com";
 
 function normalizeText(value: string): string {
   return value
@@ -138,78 +142,6 @@ function getServiceLabel(serviceType: string): string {
 
 function createBookingToken(): string {
   return crypto.randomUUID().replace(/-/g, "");
-}
-
-function normalizeBaseUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
-}
-
-function isPublicHost(hostname: string): boolean {
-  const host = hostname.trim().toLowerCase();
-  if (!host) return false;
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
-  if (host.endsWith(".local")) return false;
-  return true;
-}
-
-function resolveBookingBaseUrl(req: Request, payloadBaseUrl?: string): string {
-  const requestProvidedUrl = payloadBaseUrl?.trim() ?? "";
-  if (requestProvidedUrl) {
-    try {
-      const requestParsed = new URL(requestProvidedUrl);
-      if (requestParsed.protocol === "http:" || requestParsed.protocol === "https:") {
-        return normalizeBaseUrl(requestProvidedUrl);
-      }
-    } catch (_error) {
-      // Ignore malformed request URL and continue with other fallbacks.
-    }
-  }
-
-  const configuredUrl = Deno.env.get("BOOKING_PAGE_URL")?.trim() ?? "";
-  if (configuredUrl) {
-    try {
-      const configuredParsed = new URL(configuredUrl);
-      if (isPublicHost(configuredParsed.hostname)) {
-        return normalizeBaseUrl(configuredUrl);
-      }
-    } catch (_error) {
-      // Ignore malformed configured URL and continue to fallback chain.
-    }
-  }
-
-  const referer = req.headers.get("referer")?.trim() ?? "";
-  if (referer) {
-    try {
-      const parsed = new URL(referer);
-      if (isPublicHost(parsed.hostname)) {
-        return normalizeBaseUrl(`${parsed.origin}${parsed.pathname}`);
-      }
-    } catch (_error) {
-      // Fall through to origin/default if referer is malformed.
-    }
-  }
-
-  const origin = req.headers.get("origin")?.trim() ?? "";
-  if (origin) {
-    try {
-      const parsedOrigin = new URL(origin);
-      if (isPublicHost(parsedOrigin.hostname)) {
-        return normalizeBaseUrl(origin);
-      }
-    } catch (_error) {
-      // Ignore malformed origin and use default.
-    }
-  }
-
-  return normalizeBaseUrl(OFFER_SMS_BOOKING_URL);
-}
-
-function buildBookingUrl(baseUrl: string, token: string): string {
-  const parsed = new URL(baseUrl);
-  parsed.searchParams.set("bookingToken", token);
-  return parsed.toString();
 }
 
 function isTrappstadningService(...values: (string | undefined)[]): boolean {
@@ -318,7 +250,9 @@ function buildOfferEmailHtml(params: {
             </tr>
             <tr>
               <td colspan="2" align="center" style="padding:18px 0 26px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
+                ${
+                  params.bookingUrl
+                    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
                   <tr>
                     <td align="center" bgcolor="#b35a5a" style="background-color:#b35a5a;border-radius:14px;">
                       <a
@@ -347,7 +281,9 @@ function buildOfferEmailHtml(params: {
                       </a>
                     </td>
                   </tr>
-                </table>
+                </table>`
+                    : `<p style="font-size:20px;color:#b35a5a;margin:0;">Kontakta oss för att boka din tid.</p>`
+                }
               </td>
             </tr>
             <tr>
@@ -564,12 +500,9 @@ Deno.serve(async (req) => {
     )
   ) {
     // Manual review: save full request in offert_förfrågan only (no kund_offert, no customer email).
-    const { error: manualRequestError } = await supabase
-      .from("offert_förfrågan")
-      .insert(offertForfraganRow);
-
-    if (manualRequestError) {
-      return new Response(JSON.stringify({ error: manualRequestError.message }), {
+    const manualSave = await saveOffertForfragan(supabase, offertForfraganRow);
+    if (manualSave.error) {
+      return new Response(JSON.stringify({ error: manualSave.error }), {
         headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         status: 500
       });
@@ -579,6 +512,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         manualReview: true,
         requestSaved: true,
+        offertForfraganId: manualSave.id,
         message: MANUAL_LARGE_HOME_QUOTE_MESSAGE
       }),
       {
@@ -762,31 +696,37 @@ Deno.serve(async (req) => {
     offert = housingPricing.offert;
   }
 
-  const { error: requestInsertError } = await supabase
-    .from("offert_förfrågan")
-    .insert(offertForfraganRow);
-
-  if (requestInsertError) {
-    return new Response(JSON.stringify({ error: requestInsertError.message }), {
+  const offertForfraganSave = await saveOffertForfragan(supabase, offertForfraganRow);
+  if (offertForfraganSave.error) {
+    return new Response(JSON.stringify({ error: offertForfraganSave.error }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
 
+  const kundOffertPayload: Record<string, unknown> = {
+    tjanst_typ: persistedServiceType,
+    offert,
+    stad: city,
+    telefon: phone,
+    epost: email,
+    boknings_token: createBookingToken()
+  };
+  if (offertForfraganSave.id) {
+    kundOffertPayload.offert_forfragan_id = offertForfraganSave.id;
+  }
+
   const { data: insertedRow, error: insertError } = await supabase
     .from("kund_offert")
-    .insert({
-      tjanst_typ: persistedServiceType,
-      offert,
-      stad: city,
-      telefon: phone,
-      epost: email,
-      boknings_token: createBookingToken()
-    })
-    .select("id, offert, stad, telefon, epost, skapad, boknings_token")
+    .insert(kundOffertPayload)
+    .select("id, offert, stad, telefon, epost, skapad, boknings_token, offert_forfragan_id")
     .single();
 
   if (insertError) {
+    if (offertForfraganSave.id) {
+      await deleteOffertForfraganById(supabase, offertForfraganSave.id);
+    }
+    console.error("kund_offert insert failed:", insertError.message);
     return new Response(JSON.stringify({ error: insertError.message }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
@@ -797,6 +737,11 @@ Deno.serve(async (req) => {
   const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
   const bookingBaseUrl = resolveBookingBaseUrl(req, bookingPageUrl);
   const bookingUrl = buildBookingUrl(bookingBaseUrl, insertedRow.boknings_token);
+  if (!bookingUrl) {
+    console.error(
+      "Offer email will not include a booking link. Set Supabase secret BOOKING_PAGE_URL to your deployed form URL."
+    );
+  }
   if (resendApiKey && resendFromEmail) {
     try {
       const serviceLabel = getServiceLabel(persistedServiceType);
@@ -843,7 +788,9 @@ Deno.serve(async (req) => {
   if (twilioAccountSid && twilioAuthToken && twilioMessagingServiceSid && normalizedPhone) {
     try {
       const serviceLabel = getServiceLabel(persistedServiceType);
-      const smsBody = `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}. Boka: ${bookingUrl}`;
+      const smsBody = bookingUrl
+        ? `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}. Boka: ${bookingUrl}`
+        : `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}.`;
       const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
       const body = new URLSearchParams({
         To: normalizedPhone,
@@ -882,6 +829,8 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       quote: insertedRow,
+      offertForfraganId: offertForfraganSave.id,
+      bookingUrl: bookingUrl || null,
       ...(housingPricing ? { pricing: housingPricing } : {}),
       ...(stairPricing ? { pricing: stairPricing } : {}),
       smsStatus,

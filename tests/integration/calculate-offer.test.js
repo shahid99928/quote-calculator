@@ -101,5 +101,16 @@ maybeDescribe("calculate-offer integration", () => {
 
     expect(error).toBeNull();
     expect(data?.[0]?.epost).toBe(email);
+
+    const { data: requestRows, error: requestError } = await admin
+      .from("offert_förfrågan")
+      .select("epost, tjanst_typ, kvadratmeter")
+      .eq("epost", email)
+      .order("id", { ascending: false })
+      .limit(1);
+
+    expect(requestError).toBeNull();
+    expect(requestRows?.[0]?.epost).toBe(email);
+    expect(requestRows?.[0]?.tjanst_typ).toBe("Flyttstadning");
   });
 });
