@@ -3,40 +3,23 @@ export function normalizePhoneDigits(phone) {
   return String(phone ?? "").replace(/\D/g, "");
 }
 
+/** Mobilnummer: exakt 10 siffror som börjar med 07. */
+export const MOBILE_PHONE_PATTERN = /^07\d{8}$/;
+
 /**
- * Giltigt svenskt nummer i nationellt format (0701234567) eller med landskod (46701234567).
- * Matchar ungefär samma regler som calculate-offer.
+ * Behåll endast inmatning som kan bli 07XXXXXXXX (max 10 tecken).
  */
+export function sanitizeMobilePhoneInput(raw) {
+  const digits = normalizePhoneDigits(raw).slice(0, 10);
+  if (!digits) return "";
+  if (digits === "0") return "0";
+  if (digits === "07" || /^07\d{0,8}$/.test(digits)) return digits;
+  if (digits.startsWith("07")) return digits.slice(0, 10);
+  return "";
+}
+
 export function isValidSwedishPhone(phone) {
-  const cleaned = normalizePhoneDigits(phone);
-  if (!cleaned) return false;
-
-  if (cleaned.startsWith("00")) {
-    const intl = cleaned.slice(2);
-    if (intl.startsWith("46")) {
-      const subscriber = intl.slice(2);
-      return subscriber.length >= 7 && subscriber.length <= 10 && /^[1-9]\d+$/.test(subscriber);
-    }
-    return intl.length >= 8 && intl.length <= 15;
-  }
-
-  if (cleaned.startsWith("46") && cleaned.length > 2) {
-    const subscriber = cleaned.slice(2);
-    return subscriber.length >= 7 && subscriber.length <= 10 && /^[1-9]\d+$/.test(subscriber);
-  }
-
-  if (cleaned.startsWith("0")) {
-    const subscriber = cleaned.slice(1);
-    if (subscriber.length < 7 || subscriber.length > 10) return false;
-    if (!/^[1-9]\d+$/.test(subscriber)) return false;
-    return /^\+\d{8,15}$/.test(`+46${subscriber}`);
-  }
-
-  if (/^\d{8,15}$/.test(cleaned)) {
-    return /^\+\d{8,15}$/.test(`+${cleaned}`);
-  }
-
-  return false;
+  return MOBILE_PHONE_PATTERN.test(normalizePhoneDigits(phone));
 }
 
 const EMAIL_PATTERN =
@@ -46,5 +29,17 @@ export function isValidEmail(email) {
   const value = String(email ?? "").trim();
   if (!value || value.length > 254) return false;
   if (/\s/.test(value)) return false;
-  return EMAIL_PATTERN.test(value);
+  if (!EMAIL_PATTERN.test(value)) return false;
+
+  const at = value.lastIndexOf("@");
+  if (at <= 0 || at === value.length - 1) return false;
+
+  const local = value.slice(0, at);
+  const domain = value.slice(at + 1);
+
+  if (!/[a-zA-Z]/.test(local)) return false;
+  if (local.startsWith(".") || local.endsWith(".") || local.includes("..")) return false;
+  if (domain.startsWith("-") || domain.endsWith("-") || domain.includes("..")) return false;
+
+  return true;
 }

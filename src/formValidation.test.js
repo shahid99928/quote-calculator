@@ -95,11 +95,12 @@ describe("getFormErrors", () => {
     expect(errors.city).toBe("Ange endast bokstäver.");
   });
 
-  it("kräver korrekt svenskt telefonnummer", () => {
+  it("kräver mobilnummer 07 och exakt 10 siffror", () => {
     expect(getFormErrors(makeForm({ phone: "" })).phone).toBe("Ange telefonnummer.");
-    expect(getFormErrors(makeForm({ phone: "123" })).phone).toContain("korrekt telefonnummer");
+    expect(getFormErrors(makeForm({ phone: "0724433" })).phone).toContain("korrekt telefonnummer");
+    expect(getFormErrors(makeForm({ phone: "0812345678" })).phone).toContain("korrekt telefonnummer");
+    expect(getFormErrors(makeForm({ phone: "46701234567" })).phone).toContain("korrekt telefonnummer");
     expect(getFormErrors(makeForm({ phone: "0701234567" })).phone).toBe("");
-    expect(getFormErrors(makeForm({ phone: "46701234567" })).phone).toBe("");
   });
 
   it("kräver korrekt e-postadress", () => {
@@ -108,6 +109,10 @@ describe("getFormErrors", () => {
       "Ange en korrekt e-postadress."
     );
     expect(getFormErrors(makeForm({ email: "a@b" })).email).toBe("Ange en korrekt e-postadress.");
+    expect(getFormErrors(makeForm({ email: "1111@gmail.com" })).email).toBe(
+      "Ange en korrekt e-postadress."
+    );
     expect(getFormErrors(makeForm({ email: "test@example.com" })).email).toBe("");
+    expect(getFormErrors(makeForm({ email: "shahid.abdul@outlook.com" })).email).toBe("");
   });
 });

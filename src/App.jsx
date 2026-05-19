@@ -12,6 +12,7 @@ import {
   windowTypeOptions,
   yesNoOptions
 } from "./formConfig";
+import { sanitizeMobilePhoneInput } from "./contactValidation";
 import { getFormErrors } from "./formValidation";
 
 function getOfferServiceTypeLabel(raw) {
@@ -813,9 +814,10 @@ function App() {
             id="phone"
             type="text"
             inputMode="numeric"
-            maxLength={15}
+            autoComplete="tel"
+            maxLength={10}
             value={form.phone}
-            onChange={(e) => setField("phone", e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => setField("phone", sanitizeMobilePhoneInput(e.target.value))}
             onBlur={() => markTouched("phone")}
             required
           />
@@ -827,6 +829,7 @@ function App() {
           <input
             id="email"
             type="email"
+            autoComplete="email"
             value={form.email}
             onChange={(e) => setField("email", e.target.value)}
             onBlur={() => markTouched("email")}
