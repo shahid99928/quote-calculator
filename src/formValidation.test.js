@@ -18,6 +18,32 @@ function makeForm(overrides = {}) {
 }
 
 describe("getFormErrors", () => {
+  it("validerar kvadratmeter per tjänst", () => {
+    expect(getFormErrors(makeForm({ squareMeters: "19" })).squareMeters).toContain("mellan");
+    expect(getFormErrors(makeForm({ squareMeters: "501" })).squareMeters).toContain("mellan");
+    expect(
+      getFormErrors(
+        makeForm({ serviceType: "Foretagsstadning", squareMeters: "49", frequency: "1 gång/vecka" })
+      ).squareMeters
+    ).toContain("mellan");
+    expect(
+      getFormErrors(makeForm({ serviceType: "Trappstadning BRFer", squareMeters: "40" })).squareMeters
+    ).toContain("mellan");
+    expect(getFormErrors(makeForm({ squareMeters: "55" })).squareMeters).toBe("");
+  });
+
+  it("validerar antal rum per boendetyp", () => {
+    expect(getFormErrors(makeForm({ numRooms: "0" })).numRooms).toBe("Antal rum måste vara minst 1.");
+    expect(getFormErrors(makeForm({ propertyType: "lagenhet", numRooms: "7" })).numRooms).toBe("");
+    expect(getFormErrors(makeForm({ propertyType: "lagenhet", numRooms: "11" })).numRooms).toContain(
+      "högst 10"
+    );
+    expect(getFormErrors(makeForm({ propertyType: "villa", numRooms: "2" })).numRooms).toContain(
+      "minst 3"
+    );
+    expect(getFormErrors(makeForm({ propertyType: "radhus", numRooms: "10" })).numRooms).toBe("");
+  });
+
   it("accepts a valid home-service payload", () => {
     const errors = getFormErrors(makeForm());
     expect(Object.values(errors).every((value) => value === "")).toBe(true);
@@ -40,7 +66,7 @@ describe("getFormErrors", () => {
       })
     );
 
-    expect(errors.squareMeters).toBe("Ange ett nummer som är 50 eller större.");
+    expect(errors.squareMeters).toBe("Ange kvm mellan 50 och 1000.");
     expect(errors.businessLocalType).toBe("Välj typ av lokal.");
     expect(errors.frequency).toBe("Välj städfrekvens.");
     expect(errors.workstations).toBe("");

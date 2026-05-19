@@ -26,6 +26,20 @@ export const propertyTypeOptions = [
   { value: "villa", label: "Villa" }
 ];
 
+export const MANUAL_LARGE_HOME_QUOTE_MESSAGE =
+  "Tack för din förfrågan! För större boenden gör vi en skräddarsydd beräkning – vi återkommer med din offert så fort som möjligt!";
+
+/** pricedMax = automatisk kalkyl i bostads_priser; max = högsta tillåtna i formuläret. */
+export const roomCountByPropertyType = {
+  lagenhet: { min: 1, max: 10, pricedMax: 6, label: "Lägenhet" },
+  radhus: { min: 1, max: 10, pricedMax: 7, label: "Radhus" },
+  villa: { min: 3, max: 10, pricedMax: 7, label: "Villa" }
+};
+
+export function getRoomCountLimits(propertyType) {
+  return roomCountByPropertyType[propertyType] ?? null;
+}
+
 export const windowTypeOptions = [
   { value: "2-sidiga (In/utvandiga)", label: "2-sidiga (in-/utvändiga)" },
   { value: "4-sidiga (In/utvandiga samt emellan)", label: "4-sidiga (in-/utvändiga samt emellan)" },

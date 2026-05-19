@@ -14,6 +14,11 @@ import {
 } from "./formConfig";
 import { sanitizeMobilePhoneInput } from "./contactValidation";
 import { getFormErrors } from "./formValidation";
+import { sanitizeRoomCountInput } from "./roomCountValidation";
+import {
+  getSquareMetersLimits,
+  sanitizeSquareMetersInput
+} from "./squareMetersValidation";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -271,7 +276,7 @@ function BookingPage({ bookingToken }) {
               Tidigare bokning: {existingBooking.onskat_datum}
             </div>
           )}
-          {successMessage && <div className="ok-message show">{successMessage}</div>}
+        {submitted && <div className="ok-message show">{successMessage}</div>}
 
           <button type="submit" disabled={submitting}>
             {submitting ? "Sparar…" : "Boka min tid"}
@@ -295,6 +300,7 @@ function App() {
   const [form, setForm] = useState(initialForm);
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [submitState, setSubmitState] = useState({
     loading: false,
     error: ""
@@ -334,6 +340,7 @@ function App() {
       consent: true
     });
     setSubmitted(false);
+    setSuccessMessage("");
     setSubmitState({ loading: false, error: "" });
 
     const validationErrors = getFormErrors(form);
@@ -390,6 +397,11 @@ function App() {
     }
 
     setSubmitState({ loading: false, error: "" });
+    setSuccessMessage(
+      data?.manualReview && data?.message
+        ? String(data.message)
+        : "Tack! Din förfrågan har skickats."
+    );
     setSubmitted(true);
     setForm(initialForm);
     setTouched({});
@@ -563,7 +575,9 @@ function App() {
                   inputMode="numeric"
                   maxLength={2}
                   value={form.numRooms}
-                  onChange={(e) => setField("numRooms", e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) =>
+                    setField("numRooms", sanitizeRoomCountInput(e.target.value, form.propertyType))
+                  }
                   onBlur={() => markTouched("numRooms")}
                   required
                 />
@@ -626,9 +640,11 @@ function App() {
                 id="squareMeters"
                 type="text"
                 inputMode="numeric"
-                maxLength={5}
+                maxLength={String(getSquareMetersLimits(form.serviceType)?.max ?? 500).length}
                 value={form.squareMeters}
-                onChange={(e) => setField("squareMeters", e.target.value.replace(/\D/g, ""))}
+                onChange={(e) =>
+                  setField("squareMeters", sanitizeSquareMetersInput(e.target.value, form.serviceType))
+                }
                 onBlur={() => markTouched("squareMeters")}
                 required
               />
@@ -743,9 +759,11 @@ function App() {
                 id="squareMeters"
                 type="text"
                 inputMode="numeric"
-                maxLength={5}
+                maxLength={String(getSquareMetersLimits(form.serviceType)?.max ?? 500).length}
                 value={form.squareMeters}
-                onChange={(e) => setField("squareMeters", e.target.value.replace(/\D/g, ""))}
+                onChange={(e) =>
+                  setField("squareMeters", sanitizeSquareMetersInput(e.target.value, form.serviceType))
+                }
                 onBlur={() => markTouched("squareMeters")}
                 required
               />
@@ -857,7 +875,7 @@ function App() {
           {submitState.loading ? "Skickar…" : "Beräkna mitt pris"}
         </button>
         {submitState.error && <div className="error submit-error">{submitState.error}</div>}
-        {submitted && <div className="ok-message show">Tack! Din förfrågan har skickats.</div>}
+        {submitted && <div className="ok-message show">{successMessage}</div>}
       </form>
     </main>
   );

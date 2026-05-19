@@ -9,13 +9,14 @@ import {
   yesNoOptions
 } from "./formConfig";
 import { isValidEmail, isValidSwedishPhone, normalizePhoneDigits } from "./contactValidation";
+import { validateNumRooms } from "./roomCountValidation";
+import { validateSquareMeters } from "./squareMetersValidation";
 
 export function getFormErrors(form) {
   const propertyFieldsRequired = servicesRequiringPropertyFields.includes(form.serviceType);
   const isStairService = form.serviceType === "Trappstadning BRFer";
   const isWindowService = form.serviceType === "Fonsterputs";
   const isBusinessService = form.serviceType === "Foretagsstadning";
-  const businessSqm = Number(form.squareMeters);
 
   return {
     serviceType: form.serviceType ? "" : "Välj en tjänst.",
@@ -25,27 +26,8 @@ export function getFormErrors(form) {
           ? ""
           : "Välj boendetyp."
         : "",
-    numRooms: propertyFieldsRequired
-      ? /^[0-9]+$/.test(form.numRooms)
-        ? ""
-        : "Ange endast siffror."
-      : "",
-    squareMeters: isWindowService
-      ? ""
-      : isStairService
-        ? (() => {
-            if (!/^[0-9]+$/.test(form.squareMeters)) return "Ange endast siffror.";
-            const kvm = Number(form.squareMeters);
-            if (kvm < 50 || kvm > 500) return "Ange kvm mellan 50 och 500.";
-            return "";
-          })()
-        : isBusinessService
-          ? /^[0-9]+$/.test(form.squareMeters) && Number.isFinite(businessSqm) && businessSqm >= 50
-            ? ""
-            : "Ange ett nummer som är 50 eller större."
-          : /^[0-9]+$/.test(form.squareMeters)
-            ? ""
-            : "Ange endast siffror.",
+    numRooms: propertyFieldsRequired ? validateNumRooms(form.numRooms, form.propertyType) : "",
+    squareMeters: isWindowService ? "" : validateSquareMeters(form.squareMeters, form.serviceType),
     stairwells: isStairService
       ? /^[0-9]+$/.test(form.stairwells)
         ? ""

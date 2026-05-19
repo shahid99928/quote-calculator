@@ -5,6 +5,15 @@ import {
   type BostadsPrisRow
 } from "./housingLaborCost.ts";
 import type { TrappLaborBreakdown } from "./stairLaborCost.ts";
+import { isRoomCountAboveFormMaximum } from "./roomCountRules.ts";
+import {
+  MANUAL_LARGE_HOME_QUOTE_MESSAGE,
+  requiresManualQuote
+} from "./manualQuote.ts";
+import {
+  getSquareMetersLimitsForService,
+  validateSquareMetersForService
+} from "./squareMetersRules.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -407,10 +416,22 @@ Deno.serve(async (req) => {
   if (!supportedServices.has(serviceType)) {
     return badRequest("Service type is not supported for quote calculation.");
   }
+  const isHousingPropertyServiceEarly =
+    !isBusinessService &&
+    !isWindowService &&
+    !isStairService &&
+    allowedPropertyTypes.has(normalizedPropertyType);
+
+  const sqmLimitsEarly = getSquareMetersLimitsForService(serviceType, isHousingPropertyServiceEarly);
+  const sqmValidationErrorEarly = validateSquareMetersForService(
+    Math.round(squareMeters),
+    sqmLimitsEarly
+  );
+  if (sqmValidationErrorEarly) {
+    return badRequest(sqmValidationErrorEarly);
+  }
+
   if (isBusinessService) {
-    if (!Number.isFinite(squareMeters) || squareMeters < 50) {
-      return badRequest("squareMeters must be at least 50 for Foretagsstadning.");
-    }
     if (!allowedFrequencies.has(frequency)) {
       return badRequest(
         "frequency must be one of: Engångsstädning, 1 gång/vecka, 2 gånger/vecka, Varje dag, 1 gång/månad, 2 gånger/månad."
@@ -438,9 +459,6 @@ Deno.serve(async (req) => {
     if (!Number.isInteger(elevators) || elevators < 0 || elevators > 99) {
       return badRequest("elevators must be an integer between 0 and 99.");
     }
-    if (!Number.isInteger(squareMeters) || squareMeters < 50 || squareMeters > 500) {
-      return badRequest("squareMeters must be between 50 and 500 for Trappstadning BRFer.");
-    }
     if (!allowedStairFrequencies.has(stairFrequency)) {
       return badRequest("stairFrequency must be one of: 1 gång/vecka, Varannan vecka, 1 gång/månad.");
     }
@@ -466,14 +484,14 @@ Deno.serve(async (req) => {
       return badRequest("balconyWindowCount must be empty when glazedBalcony is Nej.");
     }
   } else {
-    if (!Number.isFinite(squareMeters) || squareMeters <= 0) {
-      return badRequest("squareMeters must be greater than 0.");
-    }
     if (!allowedPropertyTypes.has(normalizedPropertyType)) {
       return badRequest("Property type must be one of: lagenhet, radhus, villa.");
     }
     if (!Number.isInteger(numRooms) || numRooms <= 0) {
       return badRequest("numRooms must be a positive integer.");
+    }
+    if (numRooms > 10) {
+      return badRequest("numRooms must be at most 10.");
     }
   }
   if (!city || !phone || !email) {
@@ -501,6 +519,60 @@ Deno.serve(async (req) => {
           ? "butikstädning"
           : "industristädning"
       : serviceType;
+
+  const isHousingPropertyService = isHousingPropertyServiceEarly;
+
+  const roundedSquareMeters = Math.round(squareMeters);
+
+  if (
+    requiresManualQuote(
+      serviceType,
+      normalizedPropertyType,
+      numRooms,
+      roundedSquareMeters,
+      isHousingPropertyService
+    )
+  ) {
+    const { error: manualRequestError } = await supabase.from("offert_förfrågan").insert({
+      tjanst_typ: persistedServiceType,
+      typ_av_lokal: isBusinessService ? businessLocalType : null,
+      antal_arbetsplatser:
+        persistedServiceType === "kontorstädning" ? workstations : null,
+      boendetyp: isBusinessService || isStairService ? null : normalizedPropertyType,
+      antal_rum: isHousingPropertyService ? numRooms : null,
+      stadfrekvens: isBusinessService || isHomeService ? frequency : isStairService ? stairFrequency : null,
+      antal_trapphus: isStairService ? stairwells : null,
+      antal_vaningar: isStairService ? floors : null,
+      antal_hissar: isStairService ? elevators : null,
+      kvadratmeter: isWindowService ? null : roundedSquareMeters,
+      antal_fonster: null,
+      fonstertyp: null,
+      inglasad_balkong: null,
+      antal_balkongfonster: null,
+      stad: city,
+      telefon: phone,
+      epost: email,
+      samtycke: consent
+    });
+
+    if (manualRequestError) {
+      return new Response(JSON.stringify({ error: manualRequestError.message }), {
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        status: 500
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        manualReview: true,
+        message: MANUAL_LARGE_HOME_QUOTE_MESSAGE
+      }),
+      {
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        status: 200
+      }
+    );
+  }
 
   let offert: number;
   let housingPricing: ReturnType<typeof calculateHousingOfferBreakdown> | null = null;
