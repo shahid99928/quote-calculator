@@ -15,6 +15,7 @@ import {
   validateSquareMetersForService
 } from "./squareMetersRules.ts";
 import { validateWindowCountForService } from "./windowCountRules.ts";
+import { buildOffertForfraganRow } from "./offertForfraganInsert.ts";
 
 type QuoteRequest = {
   serviceType: string;
@@ -526,6 +527,32 @@ Deno.serve(async (req) => {
 
   const roundedSquareMeters = Math.round(squareMeters);
 
+  const offertForfraganRow = buildOffertForfraganRow({
+    persistedServiceType,
+    normalizedPropertyType,
+    numRooms,
+    squareMeters,
+    frequency,
+    businessLocalType,
+    workstations,
+    stairwells,
+    floors,
+    elevators,
+    stairFrequency,
+    windowCount,
+    windowType,
+    glazedBalcony,
+    balconyWindowCount,
+    city,
+    phone,
+    email,
+    consent,
+    isBusinessService,
+    isHomeService,
+    isStairService,
+    isWindowService
+  });
+
   if (
     requiresManualQuote(
       serviceType,
@@ -536,28 +563,10 @@ Deno.serve(async (req) => {
       isHousingPropertyService
     )
   ) {
-    const { error: manualRequestError } = await supabase.from("offert_förfrågan").insert({
-      tjanst_typ: persistedServiceType,
-      typ_av_lokal: isBusinessService ? businessLocalType : null,
-      antal_arbetsplatser:
-        persistedServiceType === "kontorstädning" ? workstations : null,
-      boendetyp: isBusinessService || isStairService ? null : normalizedPropertyType,
-      antal_rum: isHousingPropertyService ? numRooms : null,
-      stadfrekvens: isBusinessService || isHomeService ? frequency : isStairService ? stairFrequency : null,
-      antal_trapphus: isStairService ? stairwells : null,
-      antal_vaningar: isStairService ? floors : null,
-      antal_hissar: isStairService ? elevators : null,
-      kvadratmeter: isWindowService ? null : roundedSquareMeters,
-      antal_fonster: isWindowService ? windowCount : null,
-      fonstertyp: isWindowService ? windowType : null,
-      inglasad_balkong: isWindowService ? glazedBalcony : null,
-      antal_balkongfonster:
-        isWindowService && glazedBalcony === "Ja" ? balconyWindowCount : null,
-      stad: city,
-      telefon: phone,
-      epost: email,
-      samtycke: consent
-    });
+    // Manual review: save full request in offert_förfrågan only (no kund_offert, no customer email).
+    const { error: manualRequestError } = await supabase
+      .from("offert_förfrågan")
+      .insert(offertForfraganRow);
 
     if (manualRequestError) {
       return new Response(JSON.stringify({ error: manualRequestError.message }), {
@@ -569,6 +578,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         manualReview: true,
+        requestSaved: true,
         message: MANUAL_LARGE_HOME_QUOTE_MESSAGE
       }),
       {
@@ -752,26 +762,9 @@ Deno.serve(async (req) => {
     offert = housingPricing.offert;
   }
 
-  const { error: requestInsertError } = await supabase.from("offert_förfrågan").insert({
-    tjanst_typ: persistedServiceType,
-    typ_av_lokal: isBusinessService ? businessLocalType : null,
-    antal_arbetsplatser: persistedServiceType === "kontorstädning" ? workstations : null,
-    boendetyp: isBusinessService || isStairService ? null : normalizedPropertyType,
-    antal_rum: isBusinessService || isWindowService || isStairService ? null : numRooms,
-    stadfrekvens: isBusinessService || isHomeService ? frequency : isStairService ? stairFrequency : null,
-    antal_trapphus: isStairService ? stairwells : null,
-    antal_vaningar: isStairService ? floors : null,
-    antal_hissar: isStairService ? elevators : null,
-    kvadratmeter: isWindowService ? null : Math.round(squareMeters),
-    antal_fonster: isWindowService ? windowCount : null,
-    fonstertyp: isWindowService ? windowType : null,
-    inglasad_balkong: isWindowService ? glazedBalcony : null,
-    antal_balkongfonster: isWindowService && glazedBalcony === "Ja" ? balconyWindowCount : null,
-    stad: city,
-    telefon: phone,
-    epost: email,
-    samtycke: consent
-  });
+  const { error: requestInsertError } = await supabase
+    .from("offert_förfrågan")
+    .insert(offertForfraganRow);
 
   if (requestInsertError) {
     return new Response(JSON.stringify({ error: requestInsertError.message }), {
