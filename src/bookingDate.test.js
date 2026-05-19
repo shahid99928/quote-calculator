@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatBookingDateLabel,
   getMinBookingDateString,
   getMondayBasedWeekday,
   isBookingDateNotInPast,
@@ -32,5 +33,9 @@ describe("bookingDate", () => {
 
   it("uses Monday as first weekday in calendar grid", () => {
     expect(getMondayBasedWeekday(2026, 5)).toBe(4);
+  });
+
+  it("formats booking date for display", () => {
+    expect(formatBookingDateLabel("2026-05-21")).toMatch(/21 maj 2026/);
   });
 });

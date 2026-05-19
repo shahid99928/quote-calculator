@@ -23,6 +23,7 @@ import {
 import { getOfferPriceSubtext } from "./offerPriceSubtext";
 import { BookingDatePicker } from "./BookingDatePicker";
 import {
+  formatBookingDateLabel,
   getMinBookingDateString,
   isBookingDateNotInPast,
   validateBookingDate
@@ -277,9 +278,9 @@ function BookingPage({ bookingToken }) {
           </div>
 
           {error && <div className="error submit-error">{error}</div>}
-          {existingBooking && (
+          {existingBooking && !successMessage && (
             <div className="ok-message show">
-              Tidigare bokning: {existingBooking.onskat_datum}
+              Din bokning: {formatBookingDateLabel(existingBooking.onskat_datum)}
             </div>
           )}
           {successMessage && <div className="ok-message show">{successMessage}</div>}

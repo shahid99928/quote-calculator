@@ -8,6 +8,15 @@ export function isBookingDateNotInPast(dateValue, minDate = getMinBookingDateStr
   return dateValue >= minDate;
 }
 
+export function formatBookingDateLabel(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso ?? ""))) return String(iso ?? "");
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+
 export function validateBookingDate(dateValue) {
   if (!dateValue) return "Välj ett datum för bokningen.";
   if (!isBookingDateNotInPast(dateValue)) {
