@@ -21,6 +21,7 @@ import {
   sanitizeSquareMetersInput
 } from "./squareMetersValidation";
 import { getOfferPriceSubtext } from "./offerPriceSubtext";
+import { getMinBookingDateString, validateBookingDate } from "./bookingDate";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -104,6 +105,7 @@ function BookingPage({ bookingToken }) {
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const minBookingDate = useMemo(() => getMinBookingDateString(), []);
   const bookingDateLabel = useMemo(
     () =>
       new Date().toLocaleDateString("sv-SE", {
@@ -155,8 +157,9 @@ function BookingPage({ bookingToken }) {
     setError("");
     setSuccessMessage("");
 
-    if (!requestedDate) {
-      setError("Välj ett datum för bokningen.");
+    const dateError = validateBookingDate(requestedDate);
+    if (dateError) {
+      setError(dateError);
       return;
     }
     if (!acceptedOffer) {
@@ -247,6 +250,7 @@ function BookingPage({ bookingToken }) {
             <input
               id="requestedDate"
               type="date"
+              min={minBookingDate}
               value={requestedDate}
               onChange={(e) => setRequestedDate(e.target.value)}
               required
@@ -270,7 +274,7 @@ function BookingPage({ bookingToken }) {
               Tidigare bokning: {existingBooking.onskat_datum}
             </div>
           )}
-        {submitted && <div className="ok-message show">{successMessage}</div>}
+          {successMessage && <div className="ok-message show">{successMessage}</div>}
 
           <button type="submit" disabled={submitting}>
             {submitting ? "Sparar…" : "Boka min tid"}

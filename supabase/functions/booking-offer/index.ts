@@ -32,8 +32,14 @@ function badRequest(message: string) {
   });
 }
 
+function getTodayInStockholm(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Stockholm" }).format(new Date());
+}
+
 function isValidDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  if (Number.isNaN(new Date(`${value}T12:00:00`).getTime())) return false;
+  return value >= getTodayInStockholm();
 }
 
 function normalizeText(value: string): string {
@@ -150,7 +156,9 @@ Deno.serve(async (req) => {
     return badRequest("Offer must be accepted before booking.");
   }
   if (!isValidDate(requestedDate)) {
-    return badRequest("requestedDate must be a valid date in YYYY-MM-DD format.");
+    return badRequest(
+      "requestedDate must be today or later, in YYYY-MM-DD format (Europe/Stockholm)."
+    );
   }
 
   const { data: bookingResult, error: bookingError } = await supabase
