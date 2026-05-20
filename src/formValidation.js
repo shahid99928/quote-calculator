@@ -18,6 +18,9 @@ export function getFormErrors(form) {
   const isStairService = form.serviceType === "Trappstadning BRFer";
   const isWindowService = form.serviceType === "Fonsterputs";
   const isBusinessService = form.serviceType === "Foretagsstadning";
+  const isIntString = (value) => /^[0-9]+$/.test(String(value ?? "").trim());
+  const toInt = (value) => Number.parseInt(String(value ?? "").trim(), 10);
+  const inRange = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
 
   return {
     serviceType: form.serviceType ? "" : "Välj en tjänst.",
@@ -30,19 +33,25 @@ export function getFormErrors(form) {
     numRooms: propertyFieldsRequired ? validateNumRooms(form.numRooms, form.propertyType) : "",
     squareMeters: isWindowService ? "" : validateSquareMeters(form.squareMeters, form.serviceType),
     stairwells: isStairService
-      ? /^[0-9]+$/.test(form.stairwells)
-        ? ""
-        : "Ange endast siffror."
+      ? !isIntString(form.stairwells)
+        ? "Ange endast siffror."
+        : inRange(toInt(form.stairwells), 1, 99)
+          ? ""
+          : "Ange ett värde mellan 1 och 99."
       : "",
     floors: isStairService
-      ? /^[0-9]+$/.test(form.floors)
-        ? ""
-        : "Ange endast siffror."
+      ? !isIntString(form.floors)
+        ? "Ange endast siffror."
+        : inRange(toInt(form.floors), 1, 99)
+          ? ""
+          : "Ange ett värde mellan 1 och 99."
       : "",
     elevators: isStairService
-      ? /^[0-9]+$/.test(form.elevators)
-        ? ""
-        : "Ange endast siffror."
+      ? !isIntString(form.elevators)
+        ? "Ange endast siffror."
+        : inRange(toInt(form.elevators), 0, 99)
+          ? ""
+          : "Ange ett värde mellan 0 och 99."
       : "",
     frequency: servicesRequiringFrequency.includes(form.serviceType)
       ? frequencyOptions.includes(form.frequency)
@@ -57,9 +66,11 @@ export function getFormErrors(form) {
         : "",
     workstations:
       form.serviceType === "Foretagsstadning" && form.businessLocalType === "Kontor"
-        ? /^[0-9]+$/.test(form.workstations)
-          ? ""
-          : "Ange endast siffror."
+        ? !isIntString(form.workstations)
+          ? "Ange endast siffror."
+          : toInt(form.workstations) > 0
+            ? ""
+            : "Ange minst 1 arbetsplats."
         : "",
     stairFrequency: isStairService
       ? stairFrequencyOptions.includes(form.stairFrequency)
@@ -79,9 +90,11 @@ export function getFormErrors(form) {
       : "",
     balconyWindowCount:
       isWindowService && form.glazedBalcony === "Ja"
-        ? /^[0-9]+$/.test(form.balconyWindowCount)
-          ? ""
-          : "Ange endast siffror."
+        ? !isIntString(form.balconyWindowCount)
+          ? "Ange endast siffror."
+          : toInt(form.balconyWindowCount) > 0
+            ? ""
+            : "Ange minst 1 balkongfönster."
         : "",
     city: /^[\p{L} ]+$/u.test(form.city.trim()) ? "" : "Ange endast bokstäver.",
     phone: (() => {

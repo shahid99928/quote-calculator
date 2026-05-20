@@ -31,6 +31,15 @@ type BookingPayload = {
 const BOOKING_EMAIL_SUBJECT = "Bokningsbekräftelse - Välstädat";
 const BOOKING_SITE_URL = "https://www.valstadat.com";
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function badRequest(message: string) {
   return new Response(JSON.stringify({ error: message }), {
     headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
@@ -169,6 +178,30 @@ Deno.serve(async (req) => {
     return badRequest("Datumet kan inte ligga i det förflutna.");
   }
 
+  const { data: existingBooking } = await supabase
+    .from("kund_bokningar")
+    .select("boknings_id, kund_offert_id, onskat_datum, offert_accepterad, skapad, uppdaterad")
+    .eq("kund_offert_id", offerRow.id)
+    .maybeSingle();
+
+  if (
+    existingBooking &&
+    existingBooking.onskat_datum === requestedDate &&
+    existingBooking.offert_accepterad === true
+  ) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        alreadyBooked: true,
+        booking: existingBooking
+      }),
+      {
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        status: 200
+      }
+    );
+  }
+
   const { data: bookingResult, error: bookingError } = await supabase
     .from("kund_bokningar")
     .upsert(
@@ -190,9 +223,14 @@ Deno.serve(async (req) => {
     });
   }
 
-  const serviceLabel = getServiceLabel(String(offerRow.tjanst_typ ?? ""));
-  const offertAmount = Number(offerRow.offert);
   const bookingReference = `VS-${bookingResult.boknings_id}`;
+  const serviceLabel = getServiceLabel(String(offerRow.tjanst_typ ?? ""));
+  const escapedServiceLabel = escapeHtml(serviceLabel);
+  const escapedRequestedDate = escapeHtml(requestedDate);
+  const escapedCity = escapeHtml(String(offerRow.stad ?? ""));
+  const escapedBookingReference = escapeHtml(bookingReference);
+  const escapedSiteUrl = escapeHtml(BOOKING_SITE_URL);
+  const offertAmount = Number(offerRow.offert);
   const confirmationText = `Din bokning är bekräftad hos Välstädat. Boknings-ID: ${bookingReference}. Tjänst: ${serviceLabel}. Datum: ${requestedDate}. Stad: ${offerRow.stad}. Pris: ${Math.round(offertAmount)} kr.`;
 
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -211,10 +249,10 @@ Deno.serve(async (req) => {
             </tr>
             <tr>
               <td style="font-size:22px;line-height:1.6;color:#4a4a4a;">
-                <strong>Boknings-ID:</strong> ${bookingReference}<br />
-                <strong>Tjänst:</strong> ${serviceLabel}<br />
-                <strong>Datum:</strong> ${requestedDate}<br />
-                <strong>Stad:</strong> ${offerRow.stad}<br />
+                <strong>Boknings-ID:</strong> ${escapedBookingReference}<br />
+                <strong>Tjänst:</strong> ${escapedServiceLabel}<br />
+                <strong>Datum:</strong> ${escapedRequestedDate}<br />
+                <strong>Stad:</strong> ${escapedCity}<br />
                 <strong>Offertpris:</strong> ${offertAmount.toFixed(2)} kr
               </td>
             </tr>
@@ -225,7 +263,7 @@ Deno.serve(async (req) => {
             </tr>
             <tr>
               <td style="padding-top:18px;">
-                <a href="${BOOKING_SITE_URL}" style="font-size:20px;color:#b35a5a;text-decoration:none;font-weight:700;">
+                <a href="${escapedSiteUrl}" style="font-size:20px;color:#b35a5a;text-decoration:none;font-weight:700;">
                   Besök valstadat.com
                 </a>
               </td>

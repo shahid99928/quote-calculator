@@ -110,6 +110,15 @@ function normalizeText(value: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function badRequest(message: string) {
   return new Response(JSON.stringify({ error: message }), {
     headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
@@ -161,6 +170,9 @@ function buildOfferEmailHtml(params: {
   offert: number;
   bookingUrl: string;
 }) {
+  const escapedCity = escapeHtml(params.city);
+  const escapedServiceLabel = escapeHtml(params.serviceLabel);
+  const escapedBookingUrl = escapeHtml(params.bookingUrl);
   const priceSubtext = getOfferPriceSubtext(params.serviceType, params.serviceLabel);
   const today = new Date();
   const dateLabel = today.toLocaleDateString("sv-SE", {
@@ -207,7 +219,7 @@ function buildOfferEmailHtml(params: {
         <td align="center">
           <table role="presentation" class="email-shell" width="640" cellspacing="0" cellpadding="0" style="background:#ffffff;padding:32px 36px;">
             <tr>
-              <td style="font-size:36px;font-weight:700;color:#2d2d2d;padding-bottom:20px;">Offert ${params.serviceLabel.toLowerCase()}</td>
+              <td style="font-size:36px;font-weight:700;color:#2d2d2d;padding-bottom:20px;">Offert ${escapedServiceLabel.toLowerCase()}</td>
               <td align="right" style="font-size:14px;color:#8a8a8a;padding-bottom:20px;">${dateLabel.toUpperCase()}</td>
             </tr>
             <tr>
@@ -225,7 +237,7 @@ function buildOfferEmailHtml(params: {
             <tr>
               <td colspan="2" style="padding:12px 0;border-top:1px solid #e6e6e6;">
                 <div style="font-size:15px;color:#555;">Typ av tjänst:</div>
-                <div style="font-size:32px;line-height:1.2;color:#2d2d2d;">${params.serviceLabel}</div>
+                <div style="font-size:32px;line-height:1.2;color:#2d2d2d;">${escapedServiceLabel}</div>
               </td>
             </tr>
             <tr>
@@ -234,7 +246,7 @@ function buildOfferEmailHtml(params: {
             <tr>
               <td colspan="2" style="padding:16px 0;border-top:1px solid #e6e6e6;">
                 <div style="font-size:15px;color:#555;">Stad:</div>
-                <div style="font-size:32px;line-height:1.2;color:#2d2d2d;">${params.city}</div>
+                <div style="font-size:32px;line-height:1.2;color:#2d2d2d;">${escapedCity}</div>
               </td>
             </tr>
             <tr>
@@ -255,7 +267,7 @@ function buildOfferEmailHtml(params: {
                     <td align="center" bgcolor="#b35a5a" style="background-color:#b35a5a;border-radius:14px;">
                       <a
                         class="booking-btn"
-                        href="${params.bookingUrl}"
+                        href="${escapedBookingUrl}"
                         target="_blank"
                         style="
                           display:block;
@@ -723,7 +735,21 @@ Deno.serve(async (req) => {
 
   if (insertError) {
     if (offertForfraganSave.id) {
-      await deleteOffertForfraganById(supabase, offertForfraganSave.id);
+      const rollbackError = await deleteOffertForfraganById(supabase, offertForfraganSave.id);
+      if (rollbackError) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Could not save quote and rollback also failed. Please contact support.",
+            rollbackError,
+            orphanOffertForfraganId: offertForfraganSave.id
+          }),
+          {
+            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+            status: 500
+          }
+        );
+      }
     }
     console.error("kund_offert insert failed:", insertError.message);
     return new Response(JSON.stringify({ error: insertError.message }), {
@@ -741,6 +767,8 @@ Deno.serve(async (req) => {
       "Offer email will not include a booking link. Set Supabase secret BOOKING_PAGE_URL to your deployed form URL."
     );
   }
+  let emailStatus: "sent" | "failed" | "skipped" = "skipped";
+  let emailError: string | null = null;
   if (resendApiKey && resendFromEmail) {
     try {
       const serviceLabel = getServiceLabel(persistedServiceType);
@@ -770,12 +798,21 @@ Deno.serve(async (req) => {
       if (!resendResponse.ok) {
         const resendErrorText = await resendResponse.text();
         console.error("Resend failed:", resendResponse.status, resendErrorText);
+        emailStatus = "failed";
+        emailError = `Resend ${resendResponse.status}: ${resendErrorText}`;
+      } else {
+        emailStatus = "sent";
       }
-    } catch (emailError) {
-      console.error("Unexpected resend error:", emailError);
+    } catch (emailException) {
+      console.error("Unexpected resend error:", emailException);
+      emailStatus = "failed";
+      emailError =
+        emailException instanceof Error ? emailException.message : "Unexpected resend error.";
     }
   } else {
     console.error("Resend is not configured. Missing RESEND_API_KEY or RESEND_FROM_EMAIL.");
+    emailStatus = "skipped";
+    emailError = "Resend is not configured.";
   }
 
   const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -825,6 +862,8 @@ Deno.serve(async (req) => {
     smsError = "Twilio secrets missing or invalid phone format.";
   }
 
+  const deliveryWarning = !bookingUrl || (emailStatus !== "sent" && smsStatus !== "sent");
+
   return new Response(
     JSON.stringify({
       quote: insertedRow,
@@ -832,8 +871,11 @@ Deno.serve(async (req) => {
       bookingUrl: bookingUrl || null,
       ...(housingPricing ? { pricing: housingPricing } : {}),
       ...(stairPricing ? { pricing: stairPricing } : {}),
+      emailStatus,
+      emailError,
       smsStatus,
-      smsError
+      smsError,
+      deliveryWarning
     }),
     {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },

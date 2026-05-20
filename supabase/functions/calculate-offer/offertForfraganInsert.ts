@@ -128,9 +128,11 @@ export async function saveOffertForfragan(
 export async function deleteOffertForfraganById(
   supabase: SupabaseClient,
   id: number
-): Promise<void> {
+): Promise<string | null> {
   const { error } = await supabase.from("offert_förfrågan").delete().eq("id", id);
   if (error) {
     console.error("offert_förfrågan rollback delete failed:", error.message, id);
+    return error.message;
   }
+  return null;
 }

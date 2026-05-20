@@ -83,6 +83,17 @@ describe("getFormErrors", () => {
       })
     );
     expect(errors.workstations).toBe("Ange endast siffror.");
+
+    const zeroWorkstations = getFormErrors(
+      makeForm({
+        serviceType: "Foretagsstadning",
+        squareMeters: "120",
+        businessLocalType: "Kontor",
+        frequency: "1 gång/vecka",
+        workstations: "0"
+      })
+    );
+    expect(zeroWorkstations.workstations).toBe("Ange minst 1 arbetsplats.");
   });
 
   it("validates Fonsterputs window count range", () => {
@@ -134,6 +145,18 @@ describe("getFormErrors", () => {
     );
     expect(withBalcony.balconyWindowCount).toBe("Ange endast siffror.");
 
+    const zeroBalcony = getFormErrors(
+      makeForm({
+        serviceType: "Fonsterputs",
+        propertyType: "villa",
+        windowCount: "12",
+        windowType: "2-sidiga (In/utvandiga)",
+        glazedBalcony: "Ja",
+        balconyWindowCount: "0"
+      })
+    );
+    expect(zeroBalcony.balconyWindowCount).toBe("Ange minst 1 balkongfönster.");
+
     const withoutBalcony = getFormErrors(
       makeForm({
         serviceType: "Fonsterputs",
@@ -163,6 +186,22 @@ describe("getFormErrors", () => {
     expect(getFormErrors(makeForm({ phone: "0812345678" })).phone).toContain("korrekt telefonnummer");
     expect(getFormErrors(makeForm({ phone: "46701234567" })).phone).toContain("korrekt telefonnummer");
     expect(getFormErrors(makeForm({ phone: "0701234567" })).phone).toBe("");
+  });
+
+  it("validerar trapp-fält mot serverns intervall", () => {
+    const invalid = getFormErrors(
+      makeForm({
+        serviceType: "Trappstadning BRFer",
+        stairwells: "0",
+        floors: "100",
+        elevators: "100",
+        stairFrequency: "1 gång/vecka",
+        squareMeters: "100"
+      })
+    );
+    expect(invalid.stairwells).toBe("Ange ett värde mellan 1 och 99.");
+    expect(invalid.floors).toBe("Ange ett värde mellan 1 och 99.");
+    expect(invalid.elevators).toBe("Ange ett värde mellan 0 och 99.");
   });
 
   it("kräver korrekt e-postadress", () => {
