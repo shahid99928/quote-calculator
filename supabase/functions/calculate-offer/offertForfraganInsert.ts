@@ -1,7 +1,15 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-/** Row shape for public.offert_förfrågan – used for both automatic and manual quote flows. */
-export type OffertForfraganInsert = {
+export const OFFERT_FORFRAGAN_STATUS = {
+  AUTO: "auto",
+  MANUELL: "manuell"
+} as const;
+
+export type OffertForfraganStatus =
+  (typeof OFFERT_FORFRAGAN_STATUS)[keyof typeof OFFERT_FORFRAGAN_STATUS];
+
+/** Fields built from the calculator form (status set at insert time). */
+export type OffertForfraganFields = {
   tjanst_typ: string;
   typ_av_lokal: string | null;
   antal_arbetsplatser: number | null;
@@ -20,6 +28,10 @@ export type OffertForfraganInsert = {
   telefon: string;
   epost: string;
   samtycke: boolean;
+};
+
+export type OffertForfraganInsert = OffertForfraganFields & {
+  status: OffertForfraganStatus;
 };
 
 export type BuildOffertForfraganParams = {
@@ -49,7 +61,7 @@ export type BuildOffertForfraganParams = {
 };
 
 /** Same fields for manual review (no kund_offert, no email) and automatic quotes. */
-export function buildOffertForfraganRow(params: BuildOffertForfraganParams): OffertForfraganInsert {
+export function buildOffertForfraganRow(params: BuildOffertForfraganParams): OffertForfraganFields {
   const {
     persistedServiceType,
     normalizedPropertyType,

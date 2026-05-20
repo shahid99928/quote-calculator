@@ -19,6 +19,7 @@ import { buildBookingUrl, resolveBookingBaseUrl } from "./bookingUrl.ts";
 import {
   buildOffertForfraganRow,
   deleteOffertForfraganById,
+  OFFERT_FORFRAGAN_STATUS,
   saveOffertForfragan
 } from "./offertForfraganInsert.ts";
 import { getOfferPriceSubtext } from "./offerPriceSubtext.ts";
@@ -510,7 +511,10 @@ Deno.serve(async (req) => {
     )
   ) {
     // Manual review: save full request in offert_förfrågan only (no kund_offert, no customer email).
-    const manualSave = await saveOffertForfragan(supabase, offertForfraganRow);
+    const manualSave = await saveOffertForfragan(supabase, {
+      ...offertForfraganRow,
+      status: OFFERT_FORFRAGAN_STATUS.MANUELL
+    });
     if (manualSave.error) {
       return new Response(JSON.stringify({ error: manualSave.error }), {
         headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
@@ -706,7 +710,10 @@ Deno.serve(async (req) => {
     offert = housingPricing.offert;
   }
 
-  const offertForfraganSave = await saveOffertForfragan(supabase, offertForfraganRow);
+  const offertForfraganSave = await saveOffertForfragan(supabase, {
+    ...offertForfraganRow,
+    status: OFFERT_FORFRAGAN_STATUS.AUTO
+  });
   if (offertForfraganSave.error) {
     return new Response(JSON.stringify({ error: offertForfraganSave.error }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },

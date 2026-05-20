@@ -112,5 +112,35 @@ maybeDescribe("calculate-offer integration", () => {
     expect(requestError).toBeNull();
     expect(requestRows?.[0]?.epost).toBe(email);
     expect(requestRows?.[0]?.tjanst_typ).toBe("Flyttstadning");
+    expect(requestRows?.[0]?.status).toBe("auto");
+  });
+
+  it("sets status manuell for oversized housing quote", async () => {
+    if (!serviceRoleKey) return;
+    const admin = createClient(projectUrl, serviceRoleKey);
+    const email = `manual-${Date.now()}@example.com`;
+    const payload = {
+      serviceType: "Flyttstadning",
+      propertyType: "lagenhet",
+      numRooms: 3,
+      squareMeters: 200,
+      city: "Stockholm",
+      phone: "0701234567",
+      email,
+      consent: true
+    };
+    const { response, body } = await postCalculateOffer(payload);
+    expect(response.status).toBe(200);
+    expect(body.manualReview).toBe(true);
+
+    const { data, error } = await admin
+      .from("offert_förfrågan")
+      .select("status, epost")
+      .eq("epost", email)
+      .order("id", { ascending: false })
+      .limit(1);
+
+    expect(error).toBeNull();
+    expect(data?.[0]?.status).toBe("manuell");
   });
 });
