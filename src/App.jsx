@@ -113,7 +113,7 @@ function BookingPage({ bookingToken }) {
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const minBookingDate = useMemo(() => getMinBookingDateString(), []);
+  const minBookingDate = getMinBookingDateString();
   const bookingDateLabel = useMemo(
     () =>
       new Date().toLocaleDateString("sv-SE", {
@@ -325,10 +325,6 @@ function App() {
     return new URLSearchParams(window.location.search).get("bookingToken")?.trim() ?? "";
   }, []);
 
-  if (bookingToken) {
-    return <BookingPage bookingToken={bookingToken} />;
-  }
-
   const [form, setForm] = useState(initialForm);
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -413,10 +409,10 @@ function App() {
       consent: form.consent
     });
 
-    if (error) {
+    if (error || (data && typeof data === "object" && data.error)) {
       const detail =
         (data && typeof data === "object" && data.error && String(data.error)) ||
-        error.message ||
+        error?.message ||
         "";
       setSubmitState({
         loading: false,
@@ -427,16 +423,27 @@ function App() {
       return;
     }
 
+    if (!data || typeof data !== "object") {
+      setSubmitState({
+        loading: false,
+        error: "Kunde inte beräkna offert. Oväntat svar från servern."
+      });
+      return;
+    }
+
     setSubmitState({ loading: false, error: "" });
     const savedRequestId = data?.offertForfraganId;
     const baseMessage =
       data?.manualReview && data?.message
         ? String(data.message)
         : "Tack! Din förfrågan har skickats.";
+    const deliveryWarning = data?.deliveryWarning
+      ? " OBS: Bekräftelsen kunde inte levereras via e-post eller SMS. Kontakta oss om du inte fått meddelande."
+      : "";
     setSuccessMessage(
       savedRequestId
-        ? `${baseMessage} Din förfrågan är sparad (referens ${savedRequestId}).`
-        : baseMessage
+        ? `${baseMessage} Din förfrågan är sparad (referens ${savedRequestId}).${deliveryWarning}`
+        : `${baseMessage}${deliveryWarning}`
     );
     setSubmitted(true);
     setForm(initialForm);
@@ -444,6 +451,10 @@ function App() {
   }
 
   const showError = (name) => touched[name] && Boolean(errors[name]);
+
+  if (bookingToken) {
+    return <BookingPage bookingToken={bookingToken} />;
+  }
 
   return (
     <main className="page">
