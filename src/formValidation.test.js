@@ -66,7 +66,7 @@ describe("getFormErrors", () => {
       })
     );
 
-    expect(errors.squareMeters).toBe("Ange kvm mellan 50 och 1000.");
+    expect(errors.squareMeters).toBe("Ange kvm mellan 50 och 10000.");
     expect(errors.businessLocalType).toBe("Välj typ av lokal.");
     expect(errors.frequency).toBe("Välj städfrekvens.");
     expect(errors.workstations).toBe("");

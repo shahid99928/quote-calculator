@@ -2,14 +2,14 @@ import { servicesRequiringPropertyFields } from "./formConfig";
 
 /** Högsta kvm_till i bostads_priser per boendetyp. */
 export const HOUSING_PRICED_MAX_KVM = {
-  lagenhet: 150,
-  radhus: 250,
-  villa: 320
+  lagenhet: 200,
+  radhus: 300,
+  villa: 500
 };
 
 export const SQUARE_METERS_LIMITS = {
   stair: { min: 50, max: 500, pricedMax: 500 },
-  business: { min: 50, max: 1000, pricedMax: 500 },
+  business: { min: 50, max: 10000, pricedMax: 500 },
   housing: { min: 20, max: 500, pricedMax: 500 }
 };
 

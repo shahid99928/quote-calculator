@@ -123,7 +123,7 @@ maybeDescribe("calculate-offer integration", () => {
       serviceType: "Flyttstadning",
       propertyType: "lagenhet",
       numRooms: 3,
-      squareMeters: 200,
+      squareMeters: 201,
       city: "Stockholm",
       phone: "0701234567",
       email,

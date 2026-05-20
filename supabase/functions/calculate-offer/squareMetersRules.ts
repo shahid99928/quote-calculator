@@ -1,13 +1,13 @@
 /** Högsta kvm_till i bostads_priser per boendetyp (alla tjänster i tabellen). */
 const HOUSING_PRICED_MAX_KVM: Record<string, number> = {
-  lagenhet: 150,
-  radhus: 250,
-  villa: 320
+  lagenhet: 200,
+  radhus: 300,
+  villa: 500
 };
 
 const SQM_LIMITS: Record<string, { min: number; max: number; pricedMax: number }> = {
   stair: { min: 50, max: 500, pricedMax: 500 },
-  business: { min: 50, max: 1000, pricedMax: 500 },
+  business: { min: 50, max: 10000, pricedMax: 500 },
   housing: { min: 20, max: 500, pricedMax: 500 }
 };
 
