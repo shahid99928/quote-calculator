@@ -645,7 +645,6 @@ Deno.serve(async (req) => {
     const laborCost =
       baseFee + windowCount * perWindowPrice + effectiveBalconyWindowCount * balconyPerWindowPrice;
     const totalWithVat = laborCost * (1 + VAT_RATE);
-    // RUT deduction for eligible household services is 50% of labor cost incl. VAT.
     const rutDeduction = totalWithVat * RUT_DEDUCTION_RATE;
     offert = Number((totalWithVat - rutDeduction).toFixed(2));
   } else {

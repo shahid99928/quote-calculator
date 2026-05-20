@@ -19,15 +19,15 @@ export type HousingOfferBreakdown = {
   offert: number;
 };
 
-/** Slutpris: (arbetskostnad × 1,25) − (arbetskostnad × RUT-andel). */
+/** Slutpris: moms på arbetskostnad, sedan RUT på belopp inkl. moms (samma som fönsterputs). */
 export function calculateHousingOfferBreakdown(
   laborCost: number,
   vatRate = 0.25,
-  rutRateOnLabor = 0.5
+  rutDeductionRate = 0.5
 ): HousingOfferBreakdown {
   const moms = Number((laborCost * vatRate).toFixed(2));
   const prisInklMoms = Number((laborCost + moms).toFixed(2));
-  const rutAvdrag = Number((laborCost * rutRateOnLabor).toFixed(2));
+  const rutAvdrag = Number((prisInklMoms * rutDeductionRate).toFixed(2));
   const offert = Number((prisInklMoms - rutAvdrag).toFixed(2));
   return { arbetskostnad: laborCost, moms, prisInklMoms, rutAvdrag, offert };
 }
@@ -35,9 +35,9 @@ export function calculateHousingOfferBreakdown(
 export function calculateHousingOfferFromLaborCost(
   laborCost: number,
   vatRate = 0.25,
-  rutRateOnLabor = 0.5
+  rutDeductionRate = 0.5
 ): number {
-  return calculateHousingOfferBreakdown(laborCost, vatRate, rutRateOnLabor).offert;
+  return calculateHousingOfferBreakdown(laborCost, vatRate, rutDeductionRate).offert;
 }
 
 /**

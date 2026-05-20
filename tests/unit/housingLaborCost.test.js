@@ -20,7 +20,7 @@ describe("calculateHousingLaborCost", () => {
     }
   });
 
-  it("flyttstadning 2a 40 kvm with moms and RUT on labor cost", () => {
+  it("flyttstadning 2a 40 kvm with VAT then RUT on amount incl. VAT", () => {
     const labor = calculateHousingLaborCost(lagenhetFlytt, 2, 40);
     expect(labor.ok).toBe(true);
     if (labor.ok) {
@@ -28,8 +28,8 @@ describe("calculateHousingLaborCost", () => {
       expect(pricing.arbetskostnad).toBe(2624);
       expect(pricing.moms).toBe(656);
       expect(pricing.prisInklMoms).toBe(3280);
-      expect(pricing.rutAvdrag).toBe(1312);
-      expect(pricing.offert).toBe(1968);
+      expect(pricing.rutAvdrag).toBe(1640);
+      expect(pricing.offert).toBe(1640);
     }
   });
 
@@ -68,9 +68,10 @@ describe("calculateHousingLaborCost", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("applies VAT then RUT on labor cost for final housing offer", () => {
+  it("applies VAT then RUT on amount incl. VAT for final housing offer", () => {
     const pricing = calculateHousingOfferBreakdown(2738.4);
-    expect(pricing.offert).toBe(2053.8);
+    expect(pricing.rutAvdrag).toBe(1711.5);
+    expect(pricing.offert).toBe(1711.5);
   });
 
   it("fails when overflow needs next room but no row exists", () => {
