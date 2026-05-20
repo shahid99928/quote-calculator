@@ -31,8 +31,8 @@ export function emailsMatch(stored: string, provided: string): boolean {
 }
 
 export function getBookingTokenTtlDays(): number {
-  const configured = Number(Deno.env.get("BOOKING_TOKEN_TTL_DAYS") ?? "90");
-  return Number.isFinite(configured) && configured > 0 ? configured : 90;
+  const configured = Number(Deno.env.get("BOOKING_TOKEN_TTL_DAYS") ?? "30");
+  return Number.isFinite(configured) && configured > 0 ? configured : 30;
 }
 
 export function createBookingTokenExpiresAt(from = new Date()): string {
