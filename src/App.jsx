@@ -103,7 +103,9 @@ async function invokeEdgeFunction(functionName, body) {
 }
 
 function BookingPage({ bookingToken }) {
-  const [loading, setLoading] = useState(true);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
   const [error, setError] = useState("");
   const [offer, setOffer] = useState(null);
   const [existingBooking, setExistingBooking] = useState(null);
@@ -121,45 +123,47 @@ function BookingPage({ bookingToken }) {
     []
   );
 
-  useEffect(() => {
-    let mounted = true;
+  async function verifyEmailAndLoadOffer(event) {
+    event?.preventDefault();
+    setError("");
+    setSuccessMessage("");
 
-    async function fetchBookingContext() {
-      if (!isSupabaseConfigured || !supabase) {
-        if (mounted) {
-          setError("Supabase är inte konfigurerat.");
-          setLoading(false);
-        }
-        return;
-      }
-
-      const { data, error: invokeError } = await invokeEdgeFunction("booking-offer", {
-        action: "get",
-        token: bookingToken
-      });
-
-      if (!mounted) return;
-      if (invokeError || data?.error) {
-        setError(data?.error || invokeError?.message || "Kunde inte hämta offerten.");
-        setLoading(false);
-        return;
-      }
-
-      setOffer(data?.offer ?? null);
-      setExistingBooking(data?.booking ?? null);
-      const loadedDate = data?.booking?.onskat_datum ?? "";
-      setRequestedDate(
-        isBookingDateNotInPast(loadedDate, getMinBookingDateString()) ? loadedDate : ""
-      );
-      setAcceptedOffer(Boolean(data?.booking?.offert_accepterad));
-      setLoading(false);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError("Ange e-postadressen som användes i offertförfrågan.");
+      return;
+    }
+    if (!isSupabaseConfigured || !supabase) {
+      setError("Supabase är inte konfigurerat.");
+      return;
     }
 
-    fetchBookingContext();
-    return () => {
-      mounted = false;
-    };
-  }, [bookingToken]);
+    setVerifyingEmail(true);
+    const { data, error: invokeError } = await invokeEdgeFunction("booking-offer", {
+      action: "get",
+      token: bookingToken,
+      email: trimmedEmail
+    });
+    setVerifyingEmail(false);
+
+    if (invokeError || data?.error) {
+      setError(
+        data?.error ||
+          invokeError?.message ||
+          "Bokningslänken är ogiltig eller har gått ut. Kontrollera e-postadressen."
+      );
+      return;
+    }
+
+    setEmailVerified(true);
+    setOffer(data?.offer ?? null);
+    setExistingBooking(data?.booking ?? null);
+    const loadedDate = data?.booking?.onskat_datum ?? "";
+    setRequestedDate(
+      isBookingDateNotInPast(loadedDate, getMinBookingDateString()) ? loadedDate : ""
+    );
+    setAcceptedOffer(Boolean(data?.booking?.offert_accepterad));
+  }
 
   async function handleBookingSubmit(event) {
     event.preventDefault();
@@ -180,10 +184,17 @@ function BookingPage({ bookingToken }) {
       return;
     }
 
+    const trimmedEmail = email.trim();
+    if (!emailVerified || !trimmedEmail) {
+      setError("Bekräfta din e-postadress innan du bokar.");
+      return;
+    }
+
     setSubmitting(true);
     const { data, error: invokeError } = await invokeEdgeFunction("booking-offer", {
       action: "book",
       token: bookingToken,
+      email: trimmedEmail,
       requestedDate,
       acceptedOffer: true
     });
@@ -202,17 +213,7 @@ function BookingPage({ bookingToken }) {
     setSuccessMessage("Tack! Din bokning är registrerad.");
   }
 
-  if (loading) {
-    return (
-      <main className="page">
-        <section className="form-card">
-          <h1>Hämtar bokningssida…</h1>
-        </section>
-      </main>
-    );
-  }
-
-  if (error && !offer) {
+  if (error && !offer && !emailVerified) {
     return (
       <main className="page">
         <section className="form-card">
@@ -256,6 +257,29 @@ function BookingPage({ bookingToken }) {
           </div>
         )}
 
+        {!emailVerified ? (
+          <form onSubmit={verifyEmailAndLoadOffer} noValidate className="booking-form">
+            <h3 className="booking-section-title">Bekräfta din identitet</h3>
+            <p className="booking-email-hint">
+              Ange samma e-postadress som i offertförfrågan för att visa offerten.
+            </p>
+            <div className="field">
+              <label htmlFor="bookingEmail">E-post</label>
+              <input
+                id="bookingEmail"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            {error && <div className="error submit-error">{error}</div>}
+            <button type="submit" disabled={verifyingEmail}>
+              {verifyingEmail ? "Kontrollerar…" : "Visa min offert"}
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleBookingSubmit} noValidate className="booking-form">
           <h3 className="booking-section-title">Boka din tid nu</h3>
           <BookingDatePicker
@@ -289,6 +313,7 @@ function BookingPage({ bookingToken }) {
             {submitting ? "Sparar…" : "Boka min tid"}
           </button>
         </form>
+        )}
       </section>
     </main>
   );

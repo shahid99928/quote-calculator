@@ -1,8 +1,9 @@
-/** Hosts that must never be used as booking SPA base (no ?bookingToken= handler). */
-const BLOCKED_BOOKING_HOSTS = new Set([
-  "valstadat.com",
-  "www.valstadat.com",
-  "mpkcnixjiyvnnljhubrn.supabase.co"
+/** Hosts allowed in offer email/SMS booking links (allowlist only). */
+const DEFAULT_ALLOWED_BOOKING_HOSTS = new Set([
+  "quote-calculator-teal.vercel.app",
+  "quote-calculator-git-main-hausai.vercel.app",
+  "localhost",
+  "127.0.0.1"
 ]);
 
 export function normalizeBaseUrl(url: string): string {
@@ -11,12 +12,31 @@ export function normalizeBaseUrl(url: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
 
+function getAllowedBookingHosts(): Set<string> {
+  const hosts = new Set(DEFAULT_ALLOWED_BOOKING_HOSTS);
+
+  const extraHosts = Deno.env.get("BOOKING_PAGE_ALLOWED_HOSTS") ?? "";
+  for (const part of extraHosts.split(",")) {
+    const host = part.trim().toLowerCase();
+    if (host) hosts.add(host);
+  }
+
+  const fromEnvUrl = Deno.env.get("BOOKING_PAGE_URL") ?? "";
+  if (fromEnvUrl) {
+    try {
+      hosts.add(new URL(fromEnvUrl).hostname.toLowerCase());
+    } catch {
+      // ignore invalid BOOKING_PAGE_URL
+    }
+  }
+
+  return hosts;
+}
+
 export function isBookingPageHost(hostname: string): boolean {
   const host = hostname.trim().toLowerCase();
-  if (!host || BLOCKED_BOOKING_HOSTS.has(host)) return false;
-  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
-  if (host.endsWith(".local")) return false;
-  return true;
+  if (!host) return false;
+  return getAllowedBookingHosts().has(host);
 }
 
 function tryParseBookingBase(url: string): string | null {
@@ -33,11 +53,11 @@ function tryParseBookingBase(url: string): string | null {
 }
 
 export function resolveBookingBaseUrl(req: Request, payloadBaseUrl?: string): string {
-  const fromPayload = tryParseBookingBase(payloadBaseUrl ?? "");
-  if (fromPayload) return fromPayload;
-
   const fromEnv = tryParseBookingBase(Deno.env.get("BOOKING_PAGE_URL") ?? "");
   if (fromEnv) return fromEnv;
+
+  const fromPayload = tryParseBookingBase(payloadBaseUrl ?? "");
+  if (fromPayload) return fromPayload;
 
   const referer = req.headers.get("referer")?.trim() ?? "";
   const fromReferer = tryParseBookingBase(referer);
@@ -48,8 +68,8 @@ export function resolveBookingBaseUrl(req: Request, payloadBaseUrl?: string): st
   if (fromOrigin) return fromOrigin;
 
   console.error(
-    "BOOKING_PAGE_URL is missing or invalid, and referer/origin are not a booking app host. " +
-      "Set Supabase secret BOOKING_PAGE_URL to your Vercel form URL (e.g. https://your-app.vercel.app)."
+    "BOOKING_PAGE_URL is missing or not on the booking host allowlist, and referer/origin/payload were rejected. " +
+      "Set Supabase secret BOOKING_PAGE_URL to your production app URL (e.g. https://quote-calculator-teal.vercel.app)."
   );
   return "";
 }

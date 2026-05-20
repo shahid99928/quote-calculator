@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  assertBookingAccess,
+  BOOKING_ACCESS_ERROR,
+  toPublicBookingOffer
+} from "./bookingTokenAuth.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +23,7 @@ function getCorsHeaders(req?: Request) {
 type BookingPayload = {
   action: "get" | "book";
   token: string;
+  email: string;
   requestedDate?: string;
   acceptedOffer?: boolean;
 };
@@ -101,8 +107,12 @@ Deno.serve(async (req) => {
 
   const action = payload.action;
   const token = payload.token?.trim() ?? "";
+  const email = payload.email?.trim() ?? "";
   if (!token) {
     return badRequest("token is required.");
+  }
+  if (!email) {
+    return badRequest("email is required.");
   }
   if (action !== "get" && action !== "book") {
     return badRequest("action must be get or book.");
@@ -120,12 +130,12 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { data: offerRow, error: offerError } = await supabase
     .from("kund_offert")
-    .select("id, tjanst_typ, offert, stad, telefon, epost, skapad")
+    .select("id, tjanst_typ, offert, stad, telefon, epost, skapad, boknings_token_galler_till")
     .eq("boknings_token", token)
-    .single();
+    .maybeSingle();
 
-  if (offerError || !offerRow) {
-    return new Response(JSON.stringify({ error: "Booking link is invalid or expired." }), {
+  if (offerError || !assertBookingAccess(offerRow, email)) {
+    return new Response(JSON.stringify({ error: BOOKING_ACCESS_ERROR }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 404
     });
@@ -140,7 +150,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        offer: offerRow,
+        offer: toPublicBookingOffer(offerRow),
         booking: bookingRow ?? null
       }),
       {

@@ -242,6 +242,13 @@ button:disabled {
   margin-top: 8px;
 }
 
+.booking-email-hint {
+  margin: 0 0 12px;
+  color: #4b5563;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .booking-date-picker {
   display: flex;
   flex-direction: column;

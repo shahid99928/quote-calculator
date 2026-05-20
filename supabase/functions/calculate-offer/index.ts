@@ -23,6 +23,14 @@ import {
 } from "./offertForfraganInsert.ts";
 import { getOfferPriceSubtext } from "./offerPriceSubtext.ts";
 
+function createBookingTokenExpiresAt(): string {
+  const configured = Number(Deno.env.get("BOOKING_TOKEN_TTL_DAYS") ?? "90");
+  const ttlDays = Number.isFinite(configured) && configured > 0 ? configured : 90;
+  const expires = new Date();
+  expires.setUTCDate(expires.getUTCDate() + ttlDays);
+  return expires.toISOString();
+}
+
 type QuoteRequest = {
   serviceType: string;
   propertyType: string;
@@ -701,7 +709,8 @@ Deno.serve(async (req) => {
     stad: city,
     telefon: phone,
     epost: email,
-    boknings_token: createBookingToken()
+    boknings_token: createBookingToken(),
+    boknings_token_galler_till: createBookingTokenExpiresAt()
   };
   if (offertForfraganSave.id) {
     kundOffertPayload.offert_forfragan_id = offertForfraganSave.id;
