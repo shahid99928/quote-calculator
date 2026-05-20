@@ -40,6 +40,10 @@ maybeDescribe("calculate-offer integration", () => {
     expect(response.status).toBe(200);
     expect(body.quote).toBeTruthy();
     expect(Number(body.quote.offert)).toBeGreaterThan(0);
+    expect(body.quote.telefon).toBeUndefined();
+    expect(body.quote.epost).toBeUndefined();
+    expect(body.quote.boknings_token).toBeUndefined();
+    expect(body.bookingUrl).toBeUndefined();
   });
 
   it("returns 400 when consent is false", async () => {
@@ -73,6 +77,7 @@ maybeDescribe("calculate-offer integration", () => {
     const { response, body } = await postCalculateOffer(payload);
     expect(response.status).toBe(200);
     expect(Number(body.quote.offert)).toBe(2150);
+    expect(body.bookingUrl).toBeUndefined();
   });
 
   it("persists quote in kund_offert when service role is available", async () => {

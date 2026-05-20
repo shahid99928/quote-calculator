@@ -16,6 +16,7 @@ import {
 } from "./squareMetersRules.ts";
 import { validateWindowCountForService } from "./windowCountRules.ts";
 import { buildBookingUrl, resolveBookingBaseUrl } from "./bookingUrl.ts";
+import { toPublicCalculateOfferQuote } from "./publicQuoteResponse.ts";
 import {
   buildOffertForfraganRow,
   deleteOffertForfraganById,
@@ -721,13 +722,14 @@ Deno.serve(async (req) => {
     });
   }
 
+  const bokningsToken = createBookingToken();
   const kundOffertPayload: Record<string, unknown> = {
     tjanst_typ: persistedServiceType,
     offert,
     stad: city,
     telefon: phone,
     epost: email,
-    boknings_token: createBookingToken(),
+    boknings_token: bokningsToken,
     boknings_token_galler_till: createBookingTokenExpiresAt()
   };
   if (offertForfraganSave.id) {
@@ -737,7 +739,7 @@ Deno.serve(async (req) => {
   const { data: insertedRow, error: insertError } = await supabase
     .from("kund_offert")
     .insert(kundOffertPayload)
-    .select("id, offert, stad, telefon, epost, skapad, boknings_token, offert_forfragan_id")
+    .select("id, offert, stad, skapad, tjanst_typ, offert_forfragan_id")
     .single();
 
   if (insertError) {
@@ -768,7 +770,7 @@ Deno.serve(async (req) => {
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
   const bookingBaseUrl = resolveBookingBaseUrl(req, bookingPageUrl);
-  const bookingUrl = buildBookingUrl(bookingBaseUrl, insertedRow.boknings_token);
+  const bookingUrl = buildBookingUrl(bookingBaseUrl, bokningsToken);
   if (!bookingUrl) {
     console.error(
       "Offer email will not include a booking link. Set Supabase secret BOOKING_PAGE_URL to your deployed form URL."
@@ -873,9 +875,8 @@ Deno.serve(async (req) => {
 
   return new Response(
     JSON.stringify({
-      quote: insertedRow,
+      quote: toPublicCalculateOfferQuote(insertedRow),
       offertForfraganId: offertForfraganSave.id,
-      bookingUrl: bookingUrl || null,
       ...(housingPricing ? { pricing: housingPricing } : {}),
       ...(stairPricing ? { pricing: stairPricing } : {}),
       emailStatus,
