@@ -433,18 +433,15 @@ function App() {
 
     setSubmitState({ loading: false, error: "" });
     const savedRequestId = data?.offertForfraganId;
-    const baseMessage =
-      data?.manualReview && data?.message
-        ? String(data.message)
-        : "Tack! Din förfrågan har skickats.";
     const deliveryWarning = data?.deliveryWarning
       ? " OBS: Bekräftelsen kunde inte levereras via e-post eller SMS. Kontakta oss om du inte fått meddelande."
       : "";
-    setSuccessMessage(
-      savedRequestId
-        ? `${baseMessage} Din förfrågan är sparad (referens ${savedRequestId}).${deliveryWarning}`
-        : `${baseMessage}${deliveryWarning}`
-    );
+    const successText = savedRequestId
+      ? `Tack för din förfrågan!\nDitt bokningsnummer är ${savedRequestId}, vi återkommer inom kort med en offert.`
+      : data?.manualReview && data?.message
+        ? String(data.message)
+        : "Tack för din förfrågan!";
+    setSuccessMessage(`${successText}${deliveryWarning}`);
     setSubmitted(true);
     setForm(initialForm);
     setTouched({});

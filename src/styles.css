@@ -133,6 +133,7 @@ button:disabled {
   margin-top: 14px;
   color: #065f46;
   font-weight: 600;
+  white-space: pre-line;
 }
 
 .booking-card {
