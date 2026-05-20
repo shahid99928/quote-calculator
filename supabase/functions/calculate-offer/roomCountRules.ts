@@ -2,7 +2,7 @@ export const MANUAL_LARGE_HOME_QUOTE_MESSAGE =
   "Tack för din förfrågan! För större boenden gör vi en skräddarsydd beräkning – vi återkommer med din offert så fort som möjligt!";
 
 const ROOM_LIMITS: Record<string, { pricedMax: number; max: number }> = {
-  lagenhet: { pricedMax: 6, max: 10 },
+  lagenhet: { pricedMax: 7, max: 10 },
   radhus: { pricedMax: 7, max: 10 },
   villa: { pricedMax: 7, max: 10 }
 };

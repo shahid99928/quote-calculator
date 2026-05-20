@@ -15,7 +15,8 @@ describe("sanitizeRoomCountInput", () => {
 
 describe("isManualRoomCountQuote", () => {
   it("flags room counts above priced tiers", () => {
-    expect(isManualRoomCountQuote("lagenhet", 7)).toBe(true);
+    expect(isManualRoomCountQuote("lagenhet", 8)).toBe(true);
+    expect(isManualRoomCountQuote("lagenhet", 7)).toBe(false);
     expect(isManualRoomCountQuote("lagenhet", 6)).toBe(false);
     expect(isManualRoomCountQuote("radhus", 8)).toBe(true);
     expect(isManualRoomCountQuote("radhus", 7)).toBe(false);

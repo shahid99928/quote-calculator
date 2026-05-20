@@ -31,7 +31,7 @@ export const MANUAL_LARGE_HOME_QUOTE_MESSAGE =
 
 /** pricedMax = automatisk kalkyl i bostads_priser; max = högsta tillåtna i formuläret. */
 export const roomCountByPropertyType = {
-  lagenhet: { min: 1, max: 10, pricedMax: 6, label: "Lägenhet" },
+  lagenhet: { min: 1, max: 10, pricedMax: 7, label: "Lägenhet" },
   radhus: { min: 1, max: 10, pricedMax: 7, label: "Radhus" },
   villa: { min: 3, max: 10, pricedMax: 7, label: "Villa" }
 };
