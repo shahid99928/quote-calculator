@@ -1,3 +1,6 @@
+/** Booking links use a path segment so tokens are not stored in query strings (history, logs, Referer). */
+export const BOOKING_PATH_PREFIX = "/boka";
+
 /** Hosts allowed in offer email/SMS booking links (allowlist only). */
 const DEFAULT_ALLOWED_BOOKING_HOSTS = new Set([
   "quote-calculator-teal.vercel.app",
@@ -39,6 +42,18 @@ export function isBookingPageHost(hostname: string): boolean {
   return getAllowedBookingHosts().has(host);
 }
 
+export function stripBookingPathFromPathname(pathname: string): string {
+  const normalized = pathname.trim() || "/";
+  const lower = normalized.toLowerCase();
+  if (lower === BOOKING_PATH_PREFIX) {
+    return "";
+  }
+  if (lower.startsWith(`${BOOKING_PATH_PREFIX}/`)) {
+    return "";
+  }
+  return normalized === "/" ? "" : normalized.replace(/\/$/, "");
+}
+
 function tryParseBookingBase(url: string): string | null {
   const trimmed = url.trim();
   if (!trimmed) return null;
@@ -46,7 +61,8 @@ function tryParseBookingBase(url: string): string | null {
     const parsed = new URL(trimmed);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
     if (!isBookingPageHost(parsed.hostname)) return null;
-    return normalizeBaseUrl(`${parsed.origin}${parsed.pathname}`);
+    const path = stripBookingPathFromPathname(parsed.pathname);
+    return normalizeBaseUrl(path ? `${parsed.origin}${path}` : parsed.origin);
   } catch {
     return null;
   }
@@ -78,7 +94,15 @@ export function buildBookingUrl(baseUrl: string, token: string): string {
   if (!baseUrl) {
     return "";
   }
-  const parsed = new URL(baseUrl);
-  parsed.searchParams.set("bookingToken", token);
+  const trimmedToken = token.trim();
+  if (!trimmedToken) {
+    return "";
+  }
+  const parsed = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
+  parsed.search = "";
+  parsed.hash = "";
+  const basePath = stripBookingPathFromPathname(parsed.pathname);
+  const prefix = basePath ? `${basePath}${BOOKING_PATH_PREFIX}` : BOOKING_PATH_PREFIX;
+  parsed.pathname = `${prefix}/${encodeURIComponent(trimmedToken)}`;
   return parsed.toString();
 }

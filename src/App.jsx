@@ -28,6 +28,11 @@ import {
   isBookingDateNotInPast,
   validateBookingDate
 } from "./bookingDate";
+import {
+  getBookingPageBaseUrl,
+  migrateLegacyBookingTokenInUrl,
+  parseBookingTokenFromLocation
+} from "./bookingPath";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -40,17 +45,6 @@ function getOfferServiceTypeLabel(raw) {
     industristädning: "Industristädning"
   };
   return businessLabels[key] ?? key;
-}
-
-function getBookingPageUrl() {
-  if (typeof window === "undefined") return "";
-  const configured = String(import.meta.env.VITE_BOOKING_PAGE_URL ?? "").trim();
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-  const { origin, pathname } = window.location;
-  const path = pathname && pathname !== "/" ? pathname.replace(/\/$/, "") : "";
-  return `${origin}${path}`;
 }
 
 async function invokeEdgeFunction(functionName, body) {
@@ -320,9 +314,14 @@ function BookingPage({ bookingToken }) {
 }
 
 function App() {
-  const bookingToken = useMemo(() => {
+  const [bookingToken, setBookingToken] = useState(() => {
     if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("bookingToken")?.trim() ?? "";
+    return parseBookingTokenFromLocation(window.location);
+  });
+
+  useEffect(() => {
+    migrateLegacyBookingTokenInUrl();
+    setBookingToken(parseBookingTokenFromLocation(window.location));
   }, []);
 
   const [form, setForm] = useState(initialForm);
@@ -405,7 +404,7 @@ function App() {
       city: form.city.trim(),
       phone: form.phone,
       email: form.email.trim(),
-      bookingPageUrl: getBookingPageUrl(),
+      bookingPageUrl: getBookingPageBaseUrl(),
       consent: form.consent
     });
 
