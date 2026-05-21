@@ -5,7 +5,7 @@ import {
   type BostadsPrisRow
 } from "./housingLaborCost.ts";
 import type { TrappLaborBreakdown } from "./stairLaborCost.ts";
-import { isRoomCountAboveFormMaximum } from "./roomCountRules.ts";
+import { validateNumRoomsForProperty } from "./roomCountRules.ts";
 import {
   MANUAL_LARGE_HOME_QUOTE_MESSAGE,
   requiresManualQuote
@@ -438,11 +438,9 @@ Deno.serve(async (req) => {
     if (!allowedPropertyTypes.has(normalizedPropertyType)) {
       return badRequest("Property type must be one of: lagenhet, radhus, villa.");
     }
-    if (!Number.isInteger(numRooms) || numRooms <= 0) {
-      return badRequest("numRooms must be a positive integer.");
-    }
-    if (numRooms > 10) {
-      return badRequest("numRooms must be at most 10.");
+    const numRoomsError = validateNumRoomsForProperty(normalizedPropertyType, numRooms);
+    if (numRoomsError) {
+      return badRequest(numRoomsError);
     }
   }
   if (!city || !phone || !email) {
