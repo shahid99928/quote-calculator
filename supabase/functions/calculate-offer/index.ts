@@ -24,6 +24,11 @@ import {
   saveOffertForfragan
 } from "./offertForfraganInsert.ts";
 import { getOfferPriceSubtext } from "./offerPriceSubtext.ts";
+import {
+  alertAdminOfferDeliveryFailed,
+  deliverOfferToCustomer,
+  summarizeOfferDelivery
+} from "./offerDelivery.ts";
 
 function createBookingTokenExpiresAt(): string {
   const configured = Number(Deno.env.get("BOOKING_TOKEN_TTL_DAYS") ?? "30");
@@ -102,8 +107,6 @@ const allowedBusinessLocalTypes = new Set(["Kontor", "Butik", "Industri"]);
 const allowedGlazedBalconyOptions = new Set(["Ja", "Nej"]);
 const VAT_RATE = 0.25;
 const RUT_DEDUCTION_RATE = 0.5;
-const OFFER_EMAIL_SUBJECT = "Din offert - Välstädat";
-
 function normalizeText(value: string): string {
   return value
     .trim()
@@ -126,23 +129,6 @@ function badRequest(message: string) {
     headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
     status: 400
   });
-}
-
-function normalizeSwedishPhoneNumber(phone: string): string | null {
-  const cleaned = phone.replace(/[^\d+]/g, "");
-  if (!cleaned) return null;
-  if (cleaned.startsWith("+")) {
-    return /^\+\d{8,15}$/.test(cleaned) ? cleaned : null;
-  }
-  if (cleaned.startsWith("00")) {
-    const withPlus = `+${cleaned.slice(2)}`;
-    return /^\+\d{8,15}$/.test(withPlus) ? withPlus : null;
-  }
-  if (cleaned.startsWith("0")) {
-    const swedishE164 = `+46${cleaned.slice(1)}`;
-    return /^\+\d{8,15}$/.test(swedishE164) ? swedishE164 : null;
-  }
-  return /^\d{8,15}$/.test(cleaned) ? `+${cleaned}` : null;
 }
 
 function getServiceLabel(serviceType: string): string {
@@ -736,8 +722,6 @@ Deno.serve(async (req) => {
 
   const insertedRow = atomicSave.kundOffert;
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
   const bookingBaseUrl = resolveBookingBaseUrl(req, bookingPageUrl);
   const bookingUrl = buildBookingUrl(bookingBaseUrl, bokningsToken);
   if (!bookingUrl) {
@@ -745,102 +729,42 @@ Deno.serve(async (req) => {
       "Offer email will not include a booking link. Set Supabase secret BOOKING_PAGE_URL to your deployed form URL."
     );
   }
-  let emailStatus: "sent" | "failed" | "skipped" = "skipped";
-  let emailError: string | null = null;
-  if (resendApiKey && resendFromEmail) {
-    try {
-      const serviceLabel = getServiceLabel(persistedServiceType);
-      const emailHtml = buildOfferEmailHtml({
-        city,
-        serviceLabel,
-        serviceType: isStairService ? serviceType : persistedServiceType,
-        squareMeters: isWindowService ? null : Math.round(squareMeters),
-        offert,
-        bookingUrl
-      });
 
-      const resendResponse = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          from: `Välstädat <${resendFromEmail}>`,
-          to: [email],
-          subject: OFFER_EMAIL_SUBJECT,
-          html: emailHtml
-        })
-      });
+  const serviceLabel = getServiceLabel(persistedServiceType);
+  const emailHtml = buildOfferEmailHtml({
+    city,
+    serviceLabel,
+    serviceType: isStairService ? serviceType : persistedServiceType,
+    squareMeters: isWindowService ? null : Math.round(squareMeters),
+    offert,
+    bookingUrl
+  });
+  const smsBody = bookingUrl
+    ? `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}. Boka: ${bookingUrl}`
+    : `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}.`;
 
-      if (!resendResponse.ok) {
-        const resendErrorText = await resendResponse.text();
-        console.error("Resend failed:", resendResponse.status, resendErrorText);
-        emailStatus = "failed";
-        emailError = `Resend ${resendResponse.status}: ${resendErrorText}`;
-      } else {
-        emailStatus = "sent";
-      }
-    } catch (emailException) {
-      console.error("Unexpected resend error:", emailException);
-      emailStatus = "failed";
-      emailError =
-        emailException instanceof Error ? emailException.message : "Unexpected resend error.";
-    }
-  } else {
-    console.error("Resend is not configured. Missing RESEND_API_KEY or RESEND_FROM_EMAIL.");
-    emailStatus = "skipped";
-    emailError = "Resend is not configured.";
+  const channels = await deliverOfferToCustomer({
+    customerEmail: email,
+    customerPhone: phone,
+    emailHtml,
+    smsBody
+  });
+  const delivery = summarizeOfferDelivery(bookingUrl, channels);
+
+  if (delivery.deliveryWarning) {
+    await alertAdminOfferDeliveryFailed({
+      offertForfraganId: atomicSave.offertForfraganId,
+      kundOffertId: insertedRow.id,
+      city,
+      serviceLabel,
+      offert,
+      customerEmail: email,
+      customerPhone: phone,
+      bookingUrl,
+      channels,
+      summary: delivery
+    });
   }
-
-  const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const twilioMessagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
-  const normalizedPhone = normalizeSwedishPhoneNumber(phone);
-  let smsStatus: "sent" | "failed" | "skipped" = "skipped";
-  let smsError: string | null = null;
-  if (twilioAccountSid && twilioAuthToken && twilioMessagingServiceSid && normalizedPhone) {
-    try {
-      const serviceLabel = getServiceLabel(persistedServiceType);
-      const smsBody = bookingUrl
-        ? `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}. Boka: ${bookingUrl}`
-        : `Hej! Din offert från Välstädat är ${Math.round(offert)} kr för ${serviceLabel} i ${city}.`;
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
-      const body = new URLSearchParams({
-        To: normalizedPhone,
-        MessagingServiceSid: twilioMessagingServiceSid,
-        Body: smsBody
-      });
-      const basicAuth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
-      const twilioResponse = await fetch(twilioUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: body.toString()
-      });
-
-      if (!twilioResponse.ok) {
-        const twilioErrorText = await twilioResponse.text();
-        console.error("Twilio SMS failed:", twilioResponse.status, twilioErrorText);
-        smsStatus = "failed";
-        smsError = `Twilio ${twilioResponse.status}: ${twilioErrorText}`;
-      } else {
-        smsStatus = "sent";
-      }
-    } catch (smsException) {
-      console.error("Unexpected Twilio SMS error:", smsException);
-      smsStatus = "failed";
-      smsError = smsException instanceof Error ? smsException.message : "Unexpected Twilio SMS error.";
-    }
-  } else {
-    console.error("Twilio SMS skipped. Missing secrets or invalid phone format.");
-    smsStatus = "skipped";
-    smsError = "Twilio secrets missing or invalid phone format.";
-  }
-
-  const deliveryWarning = !bookingUrl || (emailStatus !== "sent" && smsStatus !== "sent");
 
   return new Response(
     JSON.stringify({
@@ -848,11 +772,10 @@ Deno.serve(async (req) => {
       offertForfraganId: atomicSave.offertForfraganId,
       ...(housingPricing ? { pricing: housingPricing } : {}),
       ...(stairPricing ? { pricing: stairPricing } : {}),
-      emailStatus,
-      emailError,
-      smsStatus,
-      smsError,
-      deliveryWarning
+      deliveryWarning: delivery.deliveryWarning,
+      deliveryIssue: delivery.deliveryIssue,
+      emailDelivered: delivery.emailDelivered,
+      smsDelivered: delivery.smsDelivered
     }),
     {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },

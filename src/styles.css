@@ -136,6 +136,27 @@ button:disabled {
   white-space: pre-line;
 }
 
+.delivery-warning {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 2px solid #b45309;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.delivery-warning strong {
+  display: block;
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.delivery-warning p {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
 .booking-card {
   max-width: 640px;
   margin: 0 auto;

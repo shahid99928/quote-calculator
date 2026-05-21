@@ -33,6 +33,7 @@ import {
   migrateLegacyBookingTokenInUrl,
   parseBookingTokenFromLocation
 } from "./bookingPath";
+import { getOfferDeliveryWarningMessage } from "./offerDeliveryMessage";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -328,6 +329,7 @@ function App() {
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [deliveryWarningMessage, setDeliveryWarningMessage] = useState("");
   const [submitState, setSubmitState] = useState({
     loading: false,
     error: ""
@@ -368,6 +370,7 @@ function App() {
     });
     setSubmitted(false);
     setSuccessMessage("");
+    setDeliveryWarningMessage("");
     setSubmitState({ loading: false, error: "" });
 
     const validationErrors = getFormErrors(form);
@@ -432,15 +435,13 @@ function App() {
 
     setSubmitState({ loading: false, error: "" });
     const savedRequestId = data?.offertForfraganId;
-    const deliveryWarning = data?.deliveryWarning
-      ? " OBS: Bekräftelsen kunde inte levereras via e-post eller SMS. Kontakta oss om du inte fått meddelande."
-      : "";
     const successText = savedRequestId
       ? `Tack för din förfrågan!\nDitt bokningsnummer är ${savedRequestId}, vi återkommer inom kort med en offert.`
       : data?.manualReview && data?.message
         ? String(data.message)
         : "Tack för din förfrågan!";
-    setSuccessMessage(`${successText}${deliveryWarning}`);
+    setSuccessMessage(successText);
+    setDeliveryWarningMessage(getOfferDeliveryWarningMessage(data));
     setSubmitted(true);
     setForm(initialForm);
     setTouched({});
@@ -918,7 +919,19 @@ function App() {
           {submitState.loading ? "Skickar…" : "Beräkna mitt pris"}
         </button>
         {submitState.error && <div className="error submit-error">{submitState.error}</div>}
-        {submitted && <div className="ok-message show">{successMessage}</div>}
+        {submitted && (
+          <>
+            <div className="ok-message show" role="status">
+              {successMessage}
+            </div>
+            {deliveryWarningMessage && (
+              <div className="delivery-warning show" role="alert">
+                <strong>Viktigt om din offert</strong>
+                <p>{deliveryWarningMessage}</p>
+              </div>
+            )}
+          </>
+        )}
       </form>
     </main>
   );
