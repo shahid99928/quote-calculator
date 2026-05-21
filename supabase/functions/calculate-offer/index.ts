@@ -17,9 +17,9 @@ import {
 import { validateWindowCountForService } from "./windowCountRules.ts";
 import { buildBookingUrl, resolveBookingBaseUrl } from "./bookingUrl.ts";
 import { toPublicCalculateOfferQuote } from "./publicQuoteResponse.ts";
+import { saveAutoQuoteAtomic } from "./atomicAutoQuote.ts";
 import {
   buildOffertForfraganRow,
-  deleteOffertForfraganById,
   OFFERT_FORFRAGAN_STATUS,
   saveOffertForfragan
 } from "./offertForfraganInsert.ts";
@@ -711,61 +711,32 @@ Deno.serve(async (req) => {
     offert = housingPricing.offert;
   }
 
-  const offertForfraganSave = await saveOffertForfragan(supabase, {
-    ...offertForfraganRow,
-    status: OFFERT_FORFRAGAN_STATUS.AUTO
-  });
-  if (offertForfraganSave.error) {
-    return new Response(JSON.stringify({ error: offertForfraganSave.error }), {
-      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-      status: 500
-    });
-  }
-
   const bokningsToken = createBookingToken();
-  const kundOffertPayload: Record<string, unknown> = {
-    tjanst_typ: persistedServiceType,
-    offert,
-    stad: city,
-    telefon: phone,
-    epost: email,
-    boknings_token: bokningsToken,
-    boknings_token_galler_till: createBookingTokenExpiresAt()
-  };
-  if (offertForfraganSave.id) {
-    kundOffertPayload.offert_forfragan_id = offertForfraganSave.id;
-  }
-
-  const { data: insertedRow, error: insertError } = await supabase
-    .from("kund_offert")
-    .insert(kundOffertPayload)
-    .select("id, offert, stad, skapad, tjanst_typ, offert_forfragan_id")
-    .single();
-
-  if (insertError) {
-    if (offertForfraganSave.id) {
-      const rollbackError = await deleteOffertForfraganById(supabase, offertForfraganSave.id);
-      if (rollbackError) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Could not save quote and rollback also failed. Please contact support.",
-            rollbackError,
-            orphanOffertForfraganId: offertForfraganSave.id
-          }),
-          {
-            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-            status: 500
-          }
-        );
-      }
+  const atomicSave = await saveAutoQuoteAtomic(
+    supabase,
+    {
+      ...offertForfraganRow,
+      status: OFFERT_FORFRAGAN_STATUS.AUTO
+    },
+    {
+      tjanst_typ: persistedServiceType,
+      offert,
+      stad: city,
+      telefon: phone,
+      epost: email,
+      boknings_token: bokningsToken,
+      boknings_token_galler_till: createBookingTokenExpiresAt()
     }
-    console.error("kund_offert insert failed:", insertError.message);
-    return new Response(JSON.stringify({ error: insertError.message }), {
+  );
+
+  if (!atomicSave.ok) {
+    return new Response(JSON.stringify({ error: atomicSave.error }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       status: 500
     });
   }
+
+  const insertedRow = atomicSave.kundOffert;
 
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL");
@@ -876,7 +847,7 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       quote: toPublicCalculateOfferQuote(insertedRow),
-      offertForfraganId: offertForfraganSave.id,
+      offertForfraganId: atomicSave.offertForfraganId,
       ...(housingPricing ? { pricing: housingPricing } : {}),
       ...(stairPricing ? { pricing: stairPricing } : {}),
       emailStatus,

@@ -137,6 +137,13 @@ export async function saveOffertForfragan(
   return { id: data?.id ?? null, error: null };
 }
 
+const ROLLBACK_DELETE_ATTEMPTS = 3;
+const ROLLBACK_DELETE_DELAY_MS = 150;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function deleteOffertForfraganById(
   supabase: SupabaseClient,
   id: number
@@ -147,4 +154,25 @@ export async function deleteOffertForfraganById(
     return error.message;
   }
   return null;
+}
+
+/** Retries rollback delete when a non-transactional path must clean up a saved request. */
+export async function deleteOffertForfraganByIdWithRetry(
+  supabase: SupabaseClient,
+  id: number
+): Promise<string | null> {
+  let lastError: string | null = null;
+  for (let attempt = 1; attempt <= ROLLBACK_DELETE_ATTEMPTS; attempt++) {
+    lastError = await deleteOffertForfraganById(supabase, id);
+    if (!lastError) return null;
+    if (attempt < ROLLBACK_DELETE_ATTEMPTS) {
+      await delay(ROLLBACK_DELETE_DELAY_MS * attempt);
+    }
+  }
+  console.error(
+    `offert_förfrågan rollback delete failed after ${ROLLBACK_DELETE_ATTEMPTS} attempts:`,
+    lastError,
+    id
+  );
+  return lastError;
 }
