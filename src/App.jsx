@@ -34,6 +34,8 @@ import {
   parseBookingTokenFromLocation
 } from "./bookingPath";
 import { getOfferDeliveryWarningMessage } from "./offerDeliveryMessage";
+import { TurnstileField } from "./TurnstileField";
+import { isTurnstileConfigured } from "./turnstileConfig";
 
 function getOfferServiceTypeLabel(raw) {
   const key = String(raw ?? "").trim();
@@ -330,12 +332,17 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [deliveryWarningMessage, setDeliveryWarningMessage] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [submitState, setSubmitState] = useState({
     loading: false,
     error: ""
   });
 
-  const errors = useMemo(() => getFormErrors(form), [form]);
+  const errors = useMemo(
+    () => getFormErrors(form, { turnstileToken }),
+    [form, turnstileToken]
+  );
 
   function setField(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -366,14 +373,15 @@ function App() {
       city: true,
       phone: true,
       email: true,
-      consent: true
+      consent: true,
+      turnstile: isTurnstileConfigured()
     });
     setSubmitted(false);
     setSuccessMessage("");
     setDeliveryWarningMessage("");
     setSubmitState({ loading: false, error: "" });
 
-    const validationErrors = getFormErrors(form);
+    const validationErrors = getFormErrors(form, { turnstileToken });
     if (Object.values(validationErrors).some(Boolean)) {
       return;
     }
@@ -408,7 +416,8 @@ function App() {
       phone: form.phone,
       email: form.email.trim(),
       bookingPageUrl: getBookingPageBaseUrl(),
-      consent: form.consent
+      consent: form.consent,
+      turnstileToken: turnstileToken || undefined
     });
 
     if (error || (data && typeof data === "object" && data.error)) {
@@ -416,12 +425,21 @@ function App() {
         (data && typeof data === "object" && data.error && String(data.error)) ||
         error?.message ||
         "";
+      const isRateLimited =
+        detail.includes("För många offertförfrågningar") ||
+        error?.message?.includes("429");
       setSubmitState({
         loading: false,
-        error: detail
-          ? "Kunde inte beräkna offert: " + detail
-          : "Kunde inte beräkna offert. Kontrollera edge function calculate-offer samt tabellerna kund_offert/offert_förfrågan."
+        error: isRateLimited
+          ? detail
+          : detail
+            ? "Kunde inte beräkna offert: " + detail
+            : "Kunde inte beräkna offert. Kontrollera edge function calculate-offer samt tabellerna kund_offert/offert_förfrågan."
       });
+      if (isTurnstileConfigured()) {
+        setTurnstileToken("");
+        setTurnstileResetKey((key) => key + 1);
+      }
       return;
     }
 
@@ -445,6 +463,8 @@ function App() {
     setSubmitted(true);
     setForm(initialForm);
     setTouched({});
+    setTurnstileToken("");
+    setTurnstileResetKey((key) => key + 1);
   }
 
   const showError = (name) => touched[name] && Boolean(errors[name]);
@@ -914,6 +934,16 @@ function App() {
           </label>
         </div>
         {showError("consent") && <div className="error consent-error">{errors.consent}</div>}
+
+        {isTurnstileConfigured() && (
+          <div className={`field ${showError("turnstile") ? "has-error" : ""}`}>
+            <TurnstileField
+              resetKey={turnstileResetKey}
+              onTokenChange={setTurnstileToken}
+            />
+            {showError("turnstile") && <div className="error">{errors.turnstile}</div>}
+          </div>
+        )}
 
         <button type="submit" disabled={submitState.loading}>
           {submitState.loading ? "Skickar…" : "Beräkna mitt pris"}

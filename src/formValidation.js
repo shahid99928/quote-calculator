@@ -12,8 +12,10 @@ import { isValidEmail, isValidSwedishPhone, normalizePhoneDigits } from "./conta
 import { validateNumRooms } from "./roomCountValidation";
 import { validateSquareMeters } from "./squareMetersValidation";
 import { validateWindowCount } from "./windowCountValidation";
+import { isTurnstileConfigured } from "./turnstileConfig";
 
-export function getFormErrors(form) {
+export function getFormErrors(form, options = {}) {
+  const { turnstileToken = "" } = options;
   const propertyFieldsRequired = servicesRequiringPropertyFields.includes(form.serviceType);
   const isStairService = form.serviceType === "Trappstadning BRFer";
   const isWindowService = form.serviceType === "Fonsterputs";
@@ -111,6 +113,9 @@ export function getFormErrors(form) {
       if (!isValidEmail(value)) return "Ange en korrekt e-postadress.";
       return "";
     })(),
-    consent: form.consent ? "" : "Du behöver lämna samtycke för att gå vidare."
+    consent: form.consent ? "" : "Du behöver lämna samtycke för att gå vidare.",
+    turnstile: isTurnstileConfigured() && !turnstileToken?.trim()
+      ? "Bekräfta att du inte är en robot."
+      : ""
   };
 }

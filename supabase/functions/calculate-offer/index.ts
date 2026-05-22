@@ -29,6 +29,12 @@ import {
   deliverOfferToCustomer,
   summarizeOfferDelivery
 } from "./offerDelivery.ts";
+import {
+  assertOfferRateLimit,
+  getClientIp,
+  recordOfferRateLimitEvent
+} from "./offerRateLimit.ts";
+import { verifyTurnstileToken } from "./turnstile.ts";
 
 function createBookingTokenExpiresAt(): string {
   const configured = Number(Deno.env.get("BOOKING_TOKEN_TTL_DAYS") ?? "30");
@@ -59,6 +65,7 @@ type QuoteRequest = {
   email: string;
   bookingPageUrl?: string;
   consent: boolean;
+  turnstileToken?: string;
 };
 
 const baseCorsHeaders = {
@@ -124,10 +131,17 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function badRequest(message: string) {
+function badRequest(message: string, req?: Request) {
   return new Response(JSON.stringify({ error: message }), {
-    headers: { ...baseCorsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     status: 400
+  });
+}
+
+function tooManyRequests(message: string, req?: Request) {
+  return new Response(JSON.stringify({ error: message }), {
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+    status: 429
   });
 }
 
@@ -348,10 +362,42 @@ Deno.serve(async (req) => {
   const email = payload.email?.trim() ?? "";
   const bookingPageUrl = payload.bookingPageUrl?.trim() ?? "";
   const consent = Boolean(payload.consent);
+  const turnstileToken = payload.turnstileToken?.trim() ?? "";
+  const clientIp = getClientIp(req);
 
   if (!supportedServices.has(serviceType)) {
-    return badRequest("Service type is not supported for quote calculation.");
+    return badRequest("Service type is not supported for quote calculation.", req);
   }
+
+  if (!consent) {
+    return badRequest("consent must be true.", req);
+  }
+  if (!email) {
+    return badRequest("city, phone and email are required.", req);
+  }
+
+  const captchaResult = await verifyTurnstileToken(turnstileToken, clientIp);
+  if (!captchaResult.ok) {
+    return badRequest(captchaResult.reason, req);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return new Response(JSON.stringify({ error: "Missing Supabase env vars." }), {
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+      status: 500
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const rateLimitResult = await assertOfferRateLimit(supabase, clientIp, email);
+  if (!rateLimitResult.allowed) {
+    return tooManyRequests(rateLimitResult.message, req);
+  }
+
+  await recordOfferRateLimitEvent(supabase, clientIp, email);
   const isHousingPropertyServiceEarly =
     !isBusinessService &&
     !isWindowService &&
@@ -429,23 +475,10 @@ Deno.serve(async (req) => {
       return badRequest(numRoomsError);
     }
   }
-  if (!city || !phone || !email) {
-    return badRequest("city, phone and email are required.");
-  }
-  if (!consent) {
-    return badRequest("consent must be true.");
+  if (!city || !phone) {
+    return badRequest("city, phone and email are required.", req);
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars." }), {
-      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-      status: 500
-    });
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
   const persistedServiceType =
     isBusinessService
       ? businessLocalType === "Kontor"

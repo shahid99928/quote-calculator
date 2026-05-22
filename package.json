@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:unit": "vitest run src/formValidation.test.js tests/unit/housingLaborCost.test.js",
-    "test:integration": "vitest run tests/integration/calculate-offer.test.js",
-    "test:integration:local": "supabase start && supabase db reset && set -a && eval \"$(supabase status -o env | sed -n 's/^ANON_KEY=/SUPABASE_ANON_KEY=/p; s/^API_URL=/SUPABASE_URL=/p; s/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/p; s/^FUNCTIONS_URL=/SUPABASE_FUNCTIONS_URL=/p')\" && set +a && RUN_DB_TESTS=1 npm run test:integration",
+    "test:unit": "vitest run src tests/unit tests/fixtures",
+    "test:integration": "vitest run tests/integration",
+    "test:integration:local": "supabase start && supabase db reset && set -a && eval \"$(supabase status -o env | sed -n 's/^ANON_KEY=/SUPABASE_ANON_KEY=/p; s/^API_URL=/SUPABASE_URL=/p; s/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/p; s/^FUNCTIONS_URL=/SUPABASE_FUNCTIONS_URL=/p')\" && set +a && DISABLE_OFFER_RATE_LIMIT=1 RUN_DB_TESTS=1 npm run test:integration",
     "test:e2e": "playwright test"
   },
   "dependencies": {
