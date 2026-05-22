@@ -34,6 +34,10 @@ import {
   parseBookingTokenFromLocation
 } from "./bookingPath";
 import { getOfferDeliveryWarningMessage } from "./offerDeliveryMessage";
+import {
+  getOfferSubmitErrorMessage,
+  isOfferRateLimitError
+} from "./offerSubmitErrors";
 import { TurnstileField } from "./TurnstileField";
 import { isTurnstileConfigured } from "./turnstileConfig";
 
@@ -336,7 +340,8 @@ function App() {
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [submitState, setSubmitState] = useState({
     loading: false,
-    error: ""
+    error: "",
+    isRateLimited: false
   });
 
   const errors = useMemo(
@@ -379,7 +384,7 @@ function App() {
     setSubmitted(false);
     setSuccessMessage("");
     setDeliveryWarningMessage("");
-    setSubmitState({ loading: false, error: "" });
+    setSubmitState({ loading: false, error: "", isRateLimited: false });
 
     const validationErrors = getFormErrors(form, { turnstileToken });
     if (Object.values(validationErrors).some(Boolean)) {
@@ -389,12 +394,13 @@ function App() {
     if (!isSupabaseConfigured || !supabase) {
       setSubmitState({
         loading: false,
-        error: "Supabase är inte konfigurerat. Kontrollera dina miljövariabler."
+        error: "Supabase är inte konfigurerat. Kontrollera dina miljövariabler.",
+        isRateLimited: false
       });
       return;
     }
 
-    setSubmitState({ loading: true, error: "" });
+    setSubmitState({ loading: true, error: "", isRateLimited: false });
 
     const { data, error } = await invokeEdgeFunction("calculate-offer", {
       serviceType: form.serviceType,
@@ -425,16 +431,11 @@ function App() {
         (data && typeof data === "object" && data.error && String(data.error)) ||
         error?.message ||
         "";
-      const isRateLimited =
-        detail.includes("För många offertförfrågningar") ||
-        error?.message?.includes("429");
+      const isRateLimited = isOfferRateLimitError(detail, error);
       setSubmitState({
         loading: false,
-        error: isRateLimited
-          ? detail
-          : detail
-            ? "Kunde inte beräkna offert: " + detail
-            : "Kunde inte beräkna offert. Kontrollera edge function calculate-offer samt tabellerna kund_offert/offert_förfrågan."
+        error: getOfferSubmitErrorMessage(detail, error),
+        isRateLimited
       });
       if (isTurnstileConfigured()) {
         setTurnstileToken("");
@@ -446,12 +447,13 @@ function App() {
     if (!data || typeof data !== "object") {
       setSubmitState({
         loading: false,
-        error: "Kunde inte beräkna offert. Oväntat svar från servern."
+        error: "Något gick fel när offerten skulle beräknas. Försök igen om en stund.",
+        isRateLimited: false
       });
       return;
     }
 
-    setSubmitState({ loading: false, error: "" });
+    setSubmitState({ loading: false, error: "", isRateLimited: false });
     const savedRequestId = data?.offertForfraganId;
     const successText = savedRequestId
       ? `Tack för din förfrågan!\nDitt bokningsnummer är ${savedRequestId}, vi återkommer inom kort med en offert.`
@@ -948,7 +950,14 @@ function App() {
         <button type="submit" disabled={submitState.loading}>
           {submitState.loading ? "Skickar…" : "Beräkna mitt pris"}
         </button>
-        {submitState.error && <div className="error submit-error">{submitState.error}</div>}
+        {submitState.error && (
+          <div
+            className={`error submit-error${submitState.isRateLimited ? " submit-error-rate-limit" : ""}`}
+            role="alert"
+          >
+            {submitState.error}
+          </div>
+        )}
         {submitted && (
           <>
             <div className="ok-message show" role="status">

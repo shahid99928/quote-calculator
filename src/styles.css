@@ -129,6 +129,15 @@ button:disabled {
   margin-top: 10px;
 }
 
+.submit-error-rate-limit {
+  padding: 12px 14px;
+  border: 2px solid #b45309;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #78350f;
+  line-height: 1.5;
+}
+
 .ok-message {
   margin-top: 14px;
   color: #065f46;

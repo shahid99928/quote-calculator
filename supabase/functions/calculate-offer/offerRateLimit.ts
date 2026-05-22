@@ -72,7 +72,8 @@ export async function assertOfferRateLimit(
   if (ipCount >= maxPerHour || emailCount >= maxPerHour) {
     return {
       allowed: false,
-      message: `För många offertförfrågningar. Du kan skicka högst ${maxPerHour} förfrågningar per timme. Försök igen senare.`
+      message:
+        "Du har nått gränsen för hur många offertförfrågningar som kan skickas per timme. Välkommen tillbaka om cirka en timme."
     };
   }
 

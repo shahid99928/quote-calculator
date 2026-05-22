@@ -10,7 +10,7 @@ export async function verifyTurnstileToken(
 
   const responseToken = token?.trim() ?? "";
   if (!responseToken) {
-    return { ok: false, reason: "Captcha verification is required." };
+    return { ok: false, reason: "Bekräfta captcha innan du skickar formuläret." };
   }
 
   const body = new URLSearchParams({
@@ -32,9 +32,9 @@ export async function verifyTurnstileToken(
       return { ok: true };
     }
     console.error("Turnstile verification failed:", result);
-    return { ok: false, reason: "Captcha verification failed." };
+    return { ok: false, reason: "Captcha kunde inte verifieras. Försök igen." };
   } catch (error) {
     console.error("Turnstile siteverify error:", error);
-    return { ok: false, reason: "Captcha verification unavailable." };
+    return { ok: false, reason: "Captcha är tillfälligt otillgänglig. Försök igen om en stund." };
   }
 }
