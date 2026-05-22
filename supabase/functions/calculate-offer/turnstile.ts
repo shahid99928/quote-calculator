@@ -17,7 +17,11 @@ export async function verifyTurnstileToken(
     secret,
     response: responseToken
   });
-  if (remoteIp) {
+  const isValidRemoteIp =
+    remoteIp &&
+    remoteIp !== "unknown" &&
+    (/^\d{1,3}(\.\d{1,3}){3}$/.test(remoteIp) || remoteIp.includes(":"));
+  if (isValidRemoteIp) {
     body.set("remoteip", remoteIp);
   }
 

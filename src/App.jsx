@@ -54,6 +54,30 @@ function getOfferServiceTypeLabel(raw) {
   return businessLabels[key] ?? key;
 }
 
+function edgeFunctionErrorMessage(payload, fallback) {
+  if (payload && typeof payload === "object" && payload.error) {
+    return String(payload.error);
+  }
+  return fallback;
+}
+
+async function readEdgeFunctionErrorPayload(error, data) {
+  const response = error?.context;
+  if (response && typeof response.json === "function") {
+    return response.json().catch(() => ({}));
+  }
+  return data && typeof data === "object" ? data : {};
+}
+
+function shouldRetryEdgeFunctionInvoke(error, body) {
+  // Turnstile tokens are single-use; a second POST with the same token always fails.
+  if (body?.turnstileToken) {
+    return false;
+  }
+  // Server already responded (4xx/5xx) — do not send the same request again.
+  return error?.name !== "FunctionsHttpError";
+}
+
 async function invokeEdgeFunction(functionName, body) {
   if (!isSupabaseConfigured || !supabase) {
     return { data: null, error: new Error("Supabase är inte konfigurerat.") };
@@ -75,9 +99,10 @@ async function invokeEdgeFunction(functionName, body) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const message =
-          (payload && typeof payload === "object" && payload.error && String(payload.error)) ||
-          `Edge function returned status ${response.status}.`;
+        const message = edgeFunctionErrorMessage(
+          payload,
+          `Edge function returned status ${response.status}.`
+        );
         return { data: payload, error: new Error(message) };
       }
       return { data: payload, error: null };
@@ -97,8 +122,24 @@ async function invokeEdgeFunction(functionName, body) {
     if (!error) {
       return { data, error: null };
     }
+
+    const payload = await readEdgeFunctionErrorPayload(error, data);
+    const message = edgeFunctionErrorMessage(payload, error.message);
+
+    if (!shouldRetryEdgeFunctionInvoke(error, body)) {
+      return { data: payload, error: new Error(message) };
+    }
+
     return await directFetchFallback(error);
   } catch (invokeThrowError) {
+    if (!shouldRetryEdgeFunctionInvoke(invokeThrowError, body)) {
+      const payload = await readEdgeFunctionErrorPayload(invokeThrowError, null);
+      const message = edgeFunctionErrorMessage(
+        payload,
+        invokeThrowError instanceof Error ? invokeThrowError.message : "Kunde inte nå Edge-funktionen."
+      );
+      return { data: payload, error: new Error(message) };
+    }
     return await directFetchFallback(invokeThrowError);
   }
 }
